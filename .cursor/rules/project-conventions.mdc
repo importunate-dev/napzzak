@@ -1,0 +1,39 @@
+---
+description: napzzak 프로젝트 전반 컨벤션 및 AWS 설정 가이드
+alwaysApply: true
+---
+
+# Napzzak 프로젝트 컨벤션
+
+## 프로젝트 개요
+
+영상을 업로드하면 AI 분석을 통해 스토리 기반 N컷 만화로 자동 변환하는 서비스.
+업로드 기반 처리 방식이며, 실시간 스트리밍은 사용하지 않는다.
+
+### 핵심 아키텍처
+
+- Frontend → Upload API → S3 Storage → Orchestrator → Amazon Nova 분석 → Story JSON → DB → Frontend Rendering
+- AI 호출은 1회, Story JSON 중심으로 모든 뷰가 동작
+- 렌더링 모드: Scroll형(웹툰형), 4컷 요약형, Masonry(비정형)
+
+## AWS 프로필 설정
+
+이 프로젝트에서는 **개인 AWS 계정** (`personal` 프로필)을 사용한다.
+
+### 사용 방법
+
+```bash
+# 방법 1: 명령어마다 --profile 지정
+aws s3 ls --profile personal
+
+# 방법 2: 환경변수로 세션 전체 전환
+export AWS_PROFILE=personal
+```
+
+- `--profile` 없이 실행하면 → 회사 계정 (default)
+- `--profile personal` 을 붙이면 → 개인 계정
+- **이 프로젝트의 모든 AWS 명령어에는 반드시 `--profile personal`을 사용하거나, 세션에서 `export AWS_PROFILE=personal`을 먼저 실행할 것**
+
+## 응답 언어
+
+항상 한국어로 응답한다.
