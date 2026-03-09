@@ -1,7 +1,17 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ['ffmpeg-static', 'fluent-ffmpeg', '@distube/ytdl-core', 'sharp'],
+  serverExternalPackages: [
+    'ffmpeg-static',
+    'fluent-ffmpeg',
+    '@distube/ytdl-core',
+    'sharp',
+    '@aws-sdk/client-s3',
+    '@aws-sdk/client-bedrock-runtime',
+    '@aws-sdk/client-dynamodb',
+    '@aws-sdk/lib-dynamodb',
+    '@aws-sdk/s3-request-presigner',
+  ],
   images: {
     remotePatterns: [
       {

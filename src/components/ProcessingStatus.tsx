@@ -11,19 +11,38 @@ interface Props {
 
 const PROGRESS_TO_STEP: Record<string, number> = {
   uploaded: 0,
-  analyzing: 1,
-  generating_comic: 2,
-  completed: 3,
+  transcribing: 1,
+  extracting_frames: 2,
+  analyzing_pass1_stepA: 3,
+  analyzing_pass1_stepB_identify: 4,
+  analyzing_pass1_stepB_track: 4,
+  analyzing_pass1_stepB_merge: 4,
+  analyzing_pass1_stepC: 5,
+  verifying: 6,
+  analyzing_pass2: 7,
+  generating_panels: 8,
+  generating_comic: 9,
+  completed: 10,
+  // 레거시 호환
+  analyzing: 3,
+  analyzing_pass1: 3,
 };
 
 const STEPS = [
   { label: 'S3에 영상 업로드 완료', icon: '☁️' },
-  { label: 'AI가 영상을 분석하고 있어요', icon: '🧠' },
-  { label: '만화 이미지를 생성하고 있어요', icon: '🖌️' },
+  { label: 'AWS Transcribe로 대사를 추출하고 있어요', icon: '🎙️' },
+  { label: '키프레임을 추출하고 있어요', icon: '🖼️' },
+  { label: 'AI가 대사와 화자를 분석하고 있어요 (Step A)', icon: '🗣️' },
+  { label: 'AI가 인물별 행동을 개별 추적하고 있어요 (Step B)', icon: '🔍' },
+  { label: 'AI가 분석 결과를 종합하고 있어요 (Step C)', icon: '🧩' },
+  { label: '반박 질문으로 분석 결과를 검증하고 있어요', icon: '✅' },
+  { label: '만화 패널 구조를 설계하고 있어요', icon: '🧠' },
+  { label: '패널별 만화 이미지를 생성하고 있어요', icon: '🖌️' },
+  { label: '통합 만화 페이지를 생성하고 있어요', icon: '📄' },
   { label: '만화 완성!', icon: '🎨' },
 ];
 
-const CANCEL_SUGGEST_SECONDS = 180; // 3분
+const CANCEL_SUGGEST_SECONDS = 180;
 
 export default function ProcessingStatus({ jobId, onComplete, onError }: Props) {
   const [currentStep, setCurrentStep] = useState(0);
@@ -76,7 +95,7 @@ export default function ProcessingStatus({ jobId, onComplete, onError }: Props) 
         }
 
         if (data.status === 'completed' && data.storyJson) {
-          setCurrentStep(3);
+          setCurrentStep(STEPS.length - 1);
           setTimeout(() => stableOnComplete(data.storyJson), 800);
           return;
         }
@@ -87,13 +106,12 @@ export default function ProcessingStatus({ jobId, onComplete, onError }: Props) 
         }
 
         if (data.status === 'cancelled') {
-          onError();
           return;
         }
 
-        setTimeout(poll, 3000);
+        setTimeout(poll, 2000);
       } catch {
-        if (!cancelled) setTimeout(poll, 5000);
+        if (!cancelled) setTimeout(poll, 3000);
       }
     };
 
@@ -103,17 +121,23 @@ export default function ProcessingStatus({ jobId, onComplete, onError }: Props) 
       cancelled = true;
       clearInterval(elapsedTimer);
     };
-  }, [jobId, stableOnComplete, onError]);
+  }, [jobId, stableOnComplete]);
+
+  const formatTime = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
 
   if (error) {
     return (
-      <div className="max-w-md mx-auto text-center py-20">
-        <div className="text-6xl mb-6">😢</div>
-        <p className="text-red-400 text-lg mb-2">처리에 실패했습니다</p>
-        <p className="text-gray-500 text-sm mb-8">{error}</p>
+      <div className="max-w-lg mx-auto text-center space-y-4">
+        <div className="text-6xl">😞</div>
+        <h2 className="text-xl font-bold text-red-400">처리 실패</h2>
+        <p className="text-gray-400 text-sm">{error}</p>
         <button
           onClick={onError}
-          className="px-6 py-2.5 bg-gray-800 rounded-xl hover:bg-gray-700 transition font-medium"
+          className="px-6 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition-colors"
         >
           다시 시도
         </button>
@@ -122,70 +146,68 @@ export default function ProcessingStatus({ jobId, onComplete, onError }: Props) 
   }
 
   return (
-    <div className="max-w-md mx-auto py-16">
-      <div className="text-center mb-12">
-        <div className="text-7xl mb-4 animate-bounce">{STEPS[Math.min(currentStep, 3)].icon}</div>
-        <p className="text-gray-500 text-sm">
-          경과 시간: {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, '0')}
-        </p>
-      </div>
+    <div className="max-w-lg mx-auto space-y-8">
+      {/* 진행 단계 */}
+      <div className="space-y-3">
+        {STEPS.map((step, i) => {
+          const isActive = i === currentStep;
+          const isDone = i < currentStep;
 
-      <div className="space-y-4">
-        {STEPS.map((step, i) => (
-          <div
-            key={i}
-            className={`
-              flex items-center gap-4 p-4 rounded-xl transition-all duration-500
-              ${i <= currentStep ? 'opacity-100' : 'opacity-30'}
-              ${i === currentStep ? 'bg-gray-900' : ''}
-            `}
-          >
-            <div className={`
-              w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0
-              transition-colors duration-300
-              ${i < currentStep
-                ? 'bg-emerald-600 text-white'
-                : i === currentStep
-                  ? 'bg-blue-600 text-white animate-pulse'
-                  : 'bg-gray-800 text-gray-500'}
-            `}>
-              {i < currentStep ? '✓' : i + 1}
-            </div>
-            <div className="flex-1 min-w-0">
-              <span className={`font-medium block ${i === currentStep ? 'text-white' : 'text-gray-500'}`}>
+          return (
+            <div
+              key={i}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-500 ${
+                isActive
+                  ? 'bg-blue-900 bg-opacity-30 border border-blue-700'
+                  : isDone
+                  ? 'bg-gray-900 opacity-60'
+                  : 'bg-gray-900 opacity-30'
+              }`}
+            >
+              <span className="text-xl w-8 text-center">
+                {isDone ? '✅' : isActive ? step.icon : '⬜'}
+              </span>
+              <span
+                className={`text-sm ${
+                  isActive ? 'text-blue-300 font-semibold' : isDone ? 'text-gray-500' : 'text-gray-600'
+                }`}
+              >
                 {step.label}
               </span>
-              {i === currentStep && progressDetail && (
-                <span className="text-xs text-gray-500 block mt-0.5 truncate">
-                  {progressDetail}
-                </span>
+              {isActive && (
+                <svg className="animate-spin h-4 w-4 text-blue-400 ml-auto" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
               )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {showCancelSuggest && !isCancelling && (
-        <div className="mt-8 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl text-center">
-          <p className="text-amber-400 text-sm mb-3">
-            처리 시간이 길어지고 있습니다. 취소하고 다시 시도해 보세요.
-          </p>
-          <button
-            onClick={handleCancel}
-            className="px-5 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm font-semibold transition-colors"
-          >
-            작업 취소
-          </button>
-        </div>
+      {/* 상세 진행 정보 */}
+      {progressDetail && (
+        <p className="text-center text-gray-400 text-sm">{progressDetail}</p>
       )}
 
-      <div className="mt-10 text-center">
+      {/* 경과 시간 */}
+      <p className="text-center text-gray-600 text-xs">
+        경과 시간: {formatTime(elapsed)}
+      </p>
+
+      {/* 취소 버튼 */}
+      <div className="text-center">
+        {showCancelSuggest && !isCancelling && (
+          <p className="text-yellow-500 text-xs mb-2">
+            처리가 오래 걸리고 있습니다. 취소 후 다시 시도해 보세요.
+          </p>
+        )}
         <button
           onClick={handleCancel}
           disabled={isCancelling}
-          className="text-gray-600 hover:text-gray-400 text-sm transition-colors disabled:opacity-50"
+          className="px-4 py-2 text-sm text-gray-500 hover:text-red-400 transition-colors disabled:opacity-50"
         >
-          {isCancelling ? '취소 중...' : '취소'}
+          {isCancelling ? '취소 중...' : '처리 취소'}
         </button>
       </div>
     </div>

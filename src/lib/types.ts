@@ -10,10 +10,16 @@ export interface Panel {
   panelId: number;
   description: string;
   emotion: 'joy' | 'sadness' | 'surprise' | 'anger' | 'fear' | 'neutral';
-  /** 대사 없는 만화 모드에서는 비어 있음 */
+  /** 영어 대사 (프론트 오버레이용) */
   dialogue?: string;
+  /** 한국어 대사 (프론트 오버레이용) */
+  dialogueKo?: string;
+  /** 한국어 번역 (레거시 호환) */
   translation?: string;
+  /** 영상에서 추출한 실제 대사 원문 */
   transcribedDialogue?: string;
+  /** 패널별 개별 이미지 URL (패널별 생성 모드) */
+  imageUrl?: string;
 }
 
 export interface StoryJson {
@@ -22,11 +28,18 @@ export interface StoryJson {
   summary: string;
   climaxIndex: number;
   panels: Panel[];
+  /** 단일 만화 페이지 이미지 URL (레거시 모드) */
   comicPageUrl: string;
   novaModelsUsed: string[];
   hasAudioDialogue: boolean;
   artStyle: ArtStyle;
   dialogueLanguage: DialogueLanguage;
+  /** 캐릭터 외모 설명 (이미지 생성 일관성용) */
+  characterDescriptions?: string;
+  /** 패널별 개별 이미지 모드 여부 */
+  isPanelMode?: boolean;
+  /** AWS Transcribe 대사 추출 결과 */
+  transcribeText?: string;
 }
 
 export type ViewMode = 'scroll' | 'four-cut' | 'masonry';
@@ -35,8 +48,17 @@ export type JobStatus = 'uploading' | 'processing' | 'completed' | 'failed' | 'c
 
 export type JobProgress =
   | 'uploaded'
-  | 'analyzing'
+  | 'transcribing'
+  | 'extracting_frames'
+  | 'analyzing_pass1_stepA'
+  | 'analyzing_pass1_stepB_identify'
+  | 'analyzing_pass1_stepB_track'
+  | 'analyzing_pass1_stepB_merge'
+  | 'analyzing_pass1_stepC'
+  | 'verifying'
+  | 'analyzing_pass2'
   | 'generating_comic'
+  | 'generating_panels'
   | 'completed';
 
 export interface Job {

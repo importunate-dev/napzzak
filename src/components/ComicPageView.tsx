@@ -1,84 +1,252 @@
 'use client';
 
-import { StoryJson } from '@/lib/types';
-import { useNarration } from '@/hooks/useNarration';
-import SpeakerButton from './SpeakerButton';
-
-const EMOTION_STYLES: Record<string, { border: string; label: string }> = {
-  joy: { border: 'border-yellow-400', label: '기쁨' },
-  sadness: { border: 'border-blue-400', label: '슬픔' },
-  surprise: { border: 'border-purple-400', label: '놀람' },
-  anger: { border: 'border-red-400', label: '분노' },
-  fear: { border: 'border-gray-400', label: '공포' },
-  neutral: { border: 'border-gray-600', label: '평온' },
-};
+import { useState } from 'react';
+import { StoryJson, Panel, DialogueLanguage } from '@/lib/types';
 
 interface Props {
   storyJson: StoryJson;
 }
 
-export default function ComicPageView({ storyJson }: Props) {
-  const comicPageUrl = storyJson.comicPageUrl;
-  const narration = useNarration();
+/** 감정별 말풍선 스타일 */
+const EMOTION_STYLES: Record<string, string> = {
+  joy: 'bg-yellow-50 border-yellow-300 text-yellow-900',
+  sadness: 'bg-blue-50 border-blue-300 text-blue-900',
+  surprise: 'bg-orange-50 border-orange-400 text-orange-900',
+  anger: 'bg-red-50 border-red-400 text-red-900',
+  fear: 'bg-purple-50 border-purple-300 text-purple-900',
+  neutral: 'bg-white border-gray-300 text-gray-800',
+};
 
-  if (!comicPageUrl) {
-    return null;
-  }
+/** 감정 이모지 */
+const EMOTION_EMOJI: Record<string, string> = {
+  joy: '😄',
+  sadness: '😢',
+  surprise: '😲',
+  anger: '😠',
+  fear: '😨',
+  neutral: '😐',
+};
 
-  const displayText = (panel: (typeof storyJson.panels)[0]) =>
-    (storyJson.dialogueLanguage === 'ko' && panel.translation ? panel.translation : panel.dialogue) ?? '';
-  const hasAnyDialogue = storyJson.panels?.some((p) => displayText(p)) ?? false;
+function DialogueBubble({
+  panel,
+  language,
+}: {
+  panel: Panel;
+  language: DialogueLanguage;
+}) {
+  const text = language === 'ko'
+    ? (panel.dialogueKo || panel.translation || panel.dialogue)
+    : panel.dialogue;
+
+  if (!text) return null;
+
+  const emotionStyle = EMOTION_STYLES[panel.emotion] || EMOTION_STYLES.neutral;
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="text-center mb-8">
-        <p className="text-gray-300 text-lg">{storyJson.summary}</p>
-      </div>
+    <div className={`
+      absolute bottom-2 left-2 right-2
+      px-3 py-2 rounded-xl border-2
+      text-sm font-medium leading-snug
+      shadow-lg backdrop-blur-sm
+      ${emotionStyle}
+      bg-opacity-90
+    `}>
+      <span className="mr-1">{EMOTION_EMOJI[panel.emotion] || ''}</span>
+      {text}
+    </div>
+  );
+}
 
-      <div className="bg-gray-900 rounded-2xl overflow-hidden border border-gray-800 shadow-xl mb-8">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={comicPageUrl}
-          alt="만화 페이지"
-          className="w-full h-auto"
-        />
-      </div>
+function PanelCard({
+  panel,
+  isClimax,
+  language,
+  showDialogue,
+}: {
+  panel: Panel;
+  isClimax: boolean;
+  language: DialogueLanguage;
+  showDialogue: boolean;
+}) {
+  const hasImage = !!panel.imageUrl;
 
-      {hasAnyDialogue && storyJson.panels && storyJson.panels.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="text-sm font-medium text-gray-500 mb-4">패널별 대사 (음성 재생)</h3>
-          {storyJson.panels.map((panel, index) => {
-            const text = displayText(panel);
-            if (!text) return null;
-            const emotionStyle = EMOTION_STYLES[panel.emotion] || EMOTION_STYLES.neutral;
-            const isClimax = index === storyJson.climaxIndex;
-
-            return (
-              <div
-                key={panel.panelId}
-                className={`flex items-center justify-between gap-4 p-4 rounded-xl border ${emotionStyle.border} ${
-                  isClimax ? 'ring-2 ring-yellow-400/30' : ''
-                }`}
-              >
-                <div className="flex-1 min-w-0">
-                  <span className="text-xs text-gray-500 mr-2">
-                    패널 {panel.panelId}
-                    {isClimax && (
-                      <span className="ml-2 text-yellow-400 font-medium">CLIMAX</span>
-                    )}
-                  </span>
-                  <p className="text-gray-300 text-sm mt-0.5">{text}</p>
-                </div>
-                <SpeakerButton
-                  isLoading={narration.isLoading && narration.activeCutId === panel.panelId}
-                  isPlaying={narration.isPlaying && narration.activeCutId === panel.panelId}
-                  onClick={() => narration.play(panel.panelId, panel.dialogue ?? '')}
-                  size="sm"
-                />
-              </div>
-            );
-          })}
+  return (
+    <div
+      className={`
+        relative overflow-hidden rounded-xl
+        ${isClimax ? 'ring-4 ring-yellow-400 ring-opacity-80 shadow-2xl' : 'shadow-lg'}
+        bg-gray-900 aspect-square
+        transition-transform hover:scale-[1.02]
+      `}
+    >
+      {/* 클라이맥스 배지 */}
+      {isClimax && (
+        <div className="absolute top-2 right-2 z-20 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full shadow">
+          ⭐ CLIMAX
         </div>
+      )}
+
+      {/* 패널 이미지 */}
+      {hasImage ? (
+        <img
+          src={panel.imageUrl}
+          alt={panel.description}
+          className="w-full h-full object-cover"
+          loading="lazy"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-gray-800 p-4">
+          <p className="text-gray-400 text-center text-sm">{panel.description}</p>
+        </div>
+      )}
+
+      {/* 대사 오버레이 (CSS로 렌더링 - AI 이미지 텍스트 문제 해결) */}
+      {showDialogue && (
+        <DialogueBubble panel={panel} language={language} />
+      )}
+
+      {/* 패널 번호 */}
+      <div className="absolute top-2 left-2 z-10 bg-black bg-opacity-60 text-white text-xs font-mono px-2 py-0.5 rounded">
+        {panel.panelId}
+      </div>
+    </div>
+  );
+}
+
+export default function ComicPageView({ storyJson }: Props) {
+  const [language, setLanguage] = useState<DialogueLanguage>(
+    storyJson.dialogueLanguage || 'en'
+  );
+  const [showDialogue, setShowDialogue] = useState(true);
+  const [viewMode, setViewMode] = useState<'panel' | 'page'>(
+    storyJson.isPanelMode ? 'panel' : 'page'
+  );
+
+  const hasDialogue = storyJson.panels.some(p => p.dialogue || p.dialogueKo);
+  const hasPanelImages = storyJson.panels.some(p => p.imageUrl);
+  const hasPageImage = !!storyJson.comicPageUrl;
+
+  return (
+    <div className="space-y-6">
+      {/* 컨트롤 바 */}
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        {/* 뷰 모드 전환 (패널별 / 단일 페이지) */}
+        {hasPanelImages && hasPageImage && (
+          <div className="inline-flex bg-gray-800 rounded-lg p-0.5">
+            <button
+              onClick={() => setViewMode('panel')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'panel'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              🖼️ 패널별
+            </button>
+            <button
+              onClick={() => setViewMode('page')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'page'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              📄 단일 페이지
+            </button>
+          </div>
+        )}
+
+        {/* 대사 토글 */}
+        {hasDialogue && viewMode === 'panel' && (
+          <button
+            onClick={() => setShowDialogue(!showDialogue)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              showDialogue
+                ? 'bg-emerald-600 text-white'
+                : 'bg-gray-800 text-gray-400 hover:text-white'
+            }`}
+          >
+            💬 {showDialogue ? '대사 ON' : '대사 OFF'}
+          </button>
+        )}
+
+        {/* 언어 전환 */}
+        {hasDialogue && showDialogue && viewMode === 'panel' && (
+          <div className="inline-flex bg-gray-800 rounded-lg p-0.5">
+            <button
+              onClick={() => setLanguage('en')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                language === 'en'
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              EN
+            </button>
+            <button
+              onClick={() => setLanguage('ko')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                language === 'ko'
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              KO
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 스토리 요약 */}
+      <div className="text-center">
+        <p className="text-gray-400 text-sm italic">
+          &ldquo;{storyJson.summary}&rdquo;
+        </p>
+      </div>
+
+      {/* 만화 렌더링 */}
+      {viewMode === 'panel' ? (
+        /* 패널별 그리드 렌더링 */
+        <div
+          className={`grid gap-4 ${
+            storyJson.panels.length <= 4
+              ? 'grid-cols-1 sm:grid-cols-2'
+              : 'grid-cols-2 sm:grid-cols-3'
+          }`}
+        >
+          {storyJson.panels.map((panel) => (
+            <PanelCard
+              key={panel.panelId}
+              panel={panel}
+              isClimax={panel.panelId - 1 === storyJson.climaxIndex}
+              language={language}
+              showDialogue={showDialogue}
+            />
+          ))}
+        </div>
+      ) : (
+        /* 단일 페이지 렌더링 (레거시) */
+        hasPageImage && (
+          <div className="max-w-3xl mx-auto">
+            <img
+              src={storyJson.comicPageUrl}
+              alt="AI Generated Comic Page"
+              className="w-full rounded-xl shadow-2xl"
+            />
+          </div>
+        )
+      )}
+
+      {/* 캐릭터 정보 (디버그/참고용) */}
+      {storyJson.characterDescriptions && (
+        <details className="text-xs text-gray-600 mt-4">
+          <summary className="cursor-pointer hover:text-gray-400">
+            🎭 캐릭터 정보
+          </summary>
+          <p className="mt-2 p-3 bg-gray-900 rounded-lg">
+            {storyJson.characterDescriptions}
+          </p>
+        </details>
       )}
     </div>
   );
