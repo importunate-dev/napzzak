@@ -26,6 +26,8 @@ export interface StoryJson {
   videoId: string;
   duration: number;
   summary: string;
+  /** 한국어 요약 */
+  summaryKo?: string;
   climaxIndex: number;
   panels: Panel[];
   /** 단일 만화 페이지 이미지 URL (레거시 모드) */
@@ -42,7 +44,7 @@ export interface StoryJson {
   transcribeText?: string;
 }
 
-export type ViewMode = 'scroll' | 'four-cut' | 'masonry';
+export type ViewMode = 'panel' | 'page';
 
 export type JobStatus = 'uploading' | 'processing' | 'completed' | 'failed' | 'cancelled';
 
@@ -51,9 +53,7 @@ export type JobProgress =
   | 'transcribing'
   | 'extracting_frames'
   | 'analyzing_pass1_stepA'
-  | 'analyzing_pass1_stepB_identify'
-  | 'analyzing_pass1_stepB_track'
-  | 'analyzing_pass1_stepB_merge'
+  | 'analyzing_pass1_stepB'
   | 'analyzing_pass1_stepC'
   | 'verifying'
   | 'analyzing_pass2'

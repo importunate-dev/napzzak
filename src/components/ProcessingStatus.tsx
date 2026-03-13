@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { StoryJson } from '@/lib/types';
+import { StageAnimation } from '@/components/NapzzakAnimation';
 
 interface Props {
   jobId: string;
@@ -14,9 +15,7 @@ const PROGRESS_TO_STEP: Record<string, number> = {
   transcribing: 1,
   extracting_frames: 2,
   analyzing_pass1_stepA: 3,
-  analyzing_pass1_stepB_identify: 4,
-  analyzing_pass1_stepB_track: 4,
-  analyzing_pass1_stepB_merge: 4,
+  analyzing_pass1_stepB: 4,
   analyzing_pass1_stepC: 5,
   verifying: 6,
   analyzing_pass2: 7,
@@ -26,17 +25,20 @@ const PROGRESS_TO_STEP: Record<string, number> = {
   // 레거시 호환
   analyzing: 3,
   analyzing_pass1: 3,
+  analyzing_pass1_stepB_identify: 4,
+  analyzing_pass1_stepB_track: 4,
+  analyzing_pass1_stepB_merge: 4,
 };
 
 const STEPS = [
   { label: 'S3에 영상 업로드 완료', icon: '☁️' },
   { label: 'AWS Transcribe로 대사를 추출하고 있어요', icon: '🎙️' },
   { label: '키프레임을 추출하고 있어요', icon: '🖼️' },
-  { label: 'AI가 대사와 화자를 분석하고 있어요 (Step A)', icon: '🗣️' },
-  { label: 'AI가 인물별 행동을 개별 추적하고 있어요 (Step B)', icon: '🔍' },
-  { label: 'AI가 분석 결과를 종합하고 있어요 (Step C)', icon: '🧩' },
-  { label: '반박 질문으로 분석 결과를 검증하고 있어요', icon: '✅' },
-  { label: '만화 패널 구조를 설계하고 있어요', icon: '🧠' },
+  { label: 'Nova Lite가 대사와 화자를 분석하고 있어요 (Step A)', icon: '🗣️' },
+  { label: 'Nova Lite가 인물 간 상호작용을 분석하고 있어요 (Step B)', icon: '🔍' },
+  { label: 'Nova Pro가 스토리를 종합하고 있어요 (Step C)', icon: '🧩' },
+  { label: 'Nova Pro가 반박 검증으로 정확도를 높이고 있어요', icon: '✅' },
+  { label: 'Nova Pro가 만화 패널 구조를 설계하고 있어요', icon: '🧠' },
   { label: '패널별 만화 이미지를 생성하고 있어요', icon: '🖌️' },
   { label: '통합 만화 페이지를 생성하고 있어요', icon: '📄' },
   { label: '만화 완성!', icon: '🎨' },
@@ -145,55 +147,39 @@ export default function ProcessingStatus({ jobId, onComplete, onError }: Props) 
     );
   }
 
-  return (
-    <div className="max-w-lg mx-auto space-y-8">
-      {/* 진행 단계 */}
-      <div className="space-y-3">
-        {STEPS.map((step, i) => {
-          const isActive = i === currentStep;
-          const isDone = i < currentStep;
+  const percent = Math.round((currentStep / (STEPS.length - 1)) * 100);
+  const currentLabel = STEPS[currentStep]?.label || '';
 
-          return (
-            <div
-              key={i}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-500 ${
-                isActive
-                  ? 'bg-blue-900 bg-opacity-30 border border-blue-700'
-                  : isDone
-                  ? 'bg-gray-900 opacity-60'
-                  : 'bg-gray-900 opacity-30'
-              }`}
-            >
-              <span className="text-xl w-8 text-center">
-                {isDone ? '✅' : isActive ? step.icon : '⬜'}
-              </span>
-              <span
-                className={`text-sm ${
-                  isActive ? 'text-blue-300 font-semibold' : isDone ? 'text-gray-500' : 'text-gray-600'
-                }`}
-              >
-                {step.label}
-              </span>
-              {isActive && (
-                <svg className="animate-spin h-4 w-4 text-blue-400 ml-auto" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              )}
-            </div>
-          );
-        })}
+  return (
+    <div className="max-w-lg mx-auto space-y-6">
+      {/* 단계별 애니메이션 */}
+      <div className="flex justify-center pt-4 pb-2">
+        <StageAnimation step={currentStep} />
+      </div>
+
+      {/* 현재 단계 텍스트 */}
+      <p className="text-center text-blue-300 font-semibold text-sm min-h-[1.5em]">
+        {currentLabel}
+      </p>
+
+      {/* 프로그레스 바 */}
+      <div className="space-y-2">
+        <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-700 ease-out"
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+        <div className="flex items-center justify-between text-xs text-gray-500">
+          <span>{percent}%</span>
+          <span>{formatTime(elapsed)}</span>
+        </div>
       </div>
 
       {/* 상세 진행 정보 */}
       {progressDetail && (
-        <p className="text-center text-gray-400 text-sm">{progressDetail}</p>
+        <p className="text-center text-gray-400 text-xs">{progressDetail}</p>
       )}
-
-      {/* 경과 시간 */}
-      <p className="text-center text-gray-600 text-xs">
-        경과 시간: {formatTime(elapsed)}
-      </p>
 
       {/* 취소 버튼 */}
       <div className="text-center">

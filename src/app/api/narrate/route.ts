@@ -16,13 +16,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '텍스트는 500자 이하여야 합니다' }, { status: 400 });
     }
 
-    const pcmAudio = await generateSpeech(text, voiceId || 'matthew');
+    const resolvedVoice = voiceId || 'matthew';
+    const pcmAudio = await generateSpeech(text, resolvedVoice);
     const wavAudio = lpcmToWav(pcmAudio);
 
-    return new NextResponse(new Uint8Array(wavAudio), {
+    // Buffer → ArrayBuffer 안전 변환 (Node.js Buffer 공유 풀 이슈 방지)
+    const arrayBuffer = wavAudio.buffer.slice(
+      wavAudio.byteOffset,
+      wavAudio.byteOffset + wavAudio.byteLength
+    );
+
+    return new NextResponse(arrayBuffer, {
       headers: {
         'Content-Type': 'audio/wav',
-        'Content-Length': wavAudio.length.toString(),
+        'Content-Length': wavAudio.byteLength.toString(),
         'Cache-Control': 'public, max-age=3600',
       },
     });

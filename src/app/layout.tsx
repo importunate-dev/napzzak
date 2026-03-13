@@ -8,7 +8,7 @@ const notoSansKR = Noto_Sans_KR({
 });
 
 export const metadata: Metadata = {
-  title: '냅짝 | 영상을 4컷 만화로',
+  title: '납짝 | 영상을 4컷 만화로',
   description: 'AI가 영상을 분석하여 4컷 만화로 자동 변환합니다. Powered by Amazon Nova.',
 };
 

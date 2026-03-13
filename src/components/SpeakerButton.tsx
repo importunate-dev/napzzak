@@ -21,8 +21,8 @@ export default function SpeakerButton({ isLoading, isPlaying, onClick, size = 'm
         ${isPlaying
           ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
           : isLoading
-            ? 'bg-gray-700 text-gray-400 animate-pulse'
-            : 'bg-gray-700/50 text-gray-400 hover:bg-gray-600 hover:text-white'}
+            ? 'bg-purple-700 text-purple-200 animate-pulse'
+            : 'bg-purple-600/80 text-white hover:bg-purple-500 hover:shadow-lg'}
       `}
       title={isPlaying ? '정지' : '대사 듣기'}
     >

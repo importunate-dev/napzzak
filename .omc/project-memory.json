@@ -1,0 +1,337 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1773366325498,
+  "projectRoot": "/Users/junsu/Documents/codespace/project/napzzak",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "next",
+        "version": "16.1.6",
+        "category": "fullstack"
+      },
+      {
+        "name": "react",
+        "version": "19.2.4",
+        "category": "frontend"
+      },
+      {
+        "name": "react-dom",
+        "version": "19.2.4",
+        "category": "frontend"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": null,
+    "lintCommand": "npm run lint",
+    "devCommand": "npm run dev",
+    "scripts": {
+      "dev": "next dev",
+      "build": "next build",
+      "start": "next start",
+      "lint": "next lint"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": "type-based"
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "public",
+      "scripts",
+      "src"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "img": {
+      "path": "img",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1773366325485,
+      "keyFiles": [
+        "1.jpg",
+        "2.png",
+        "3.png"
+      ]
+    },
+    "public": {
+      "path": "public",
+      "purpose": "Public files",
+      "fileCount": 0,
+      "lastAccessed": 1773366325485,
+      "keyFiles": []
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 1,
+      "lastAccessed": 1773366325490,
+      "keyFiles": [
+        "setup-aws.sh"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1773366325490,
+      "keyFiles": []
+    },
+    "src/app": {
+      "path": "src/app",
+      "purpose": "Application code",
+      "fileCount": 3,
+      "lastAccessed": 1773366325490,
+      "keyFiles": [
+        "globals.css",
+        "layout.tsx",
+        "page.tsx"
+      ]
+    },
+    "src/components": {
+      "path": "src/components",
+      "purpose": "UI components",
+      "fileCount": 11,
+      "lastAccessed": 1773366325491,
+      "keyFiles": [
+        "ComicPageView.tsx",
+        "FourCutComic.tsx",
+        "LanguageToggle.tsx"
+      ]
+    },
+    "src/lib": {
+      "path": "src/lib",
+      "purpose": "Library code",
+      "fileCount": 14,
+      "lastAccessed": 1773366325491,
+      "keyFiles": [
+        "bedrock.ts",
+        "canvas.ts",
+        "comic-page.ts"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "src/app/page.tsx",
+      "accessCount": 26,
+      "lastAccessed": 1773376479502,
+      "type": "file"
+    },
+    {
+      "path": "src/components/ComicPageView.tsx",
+      "accessCount": 14,
+      "lastAccessed": 1773377313311,
+      "type": "file"
+    },
+    {
+      "path": "src/components/NapzzakAnimation.tsx",
+      "accessCount": 14,
+      "lastAccessed": 1773377443874,
+      "type": "file"
+    },
+    {
+      "path": "src/hooks/useNarration.ts",
+      "accessCount": 10,
+      "lastAccessed": 1773377282010,
+      "type": "file"
+    },
+    {
+      "path": "ARCHITECTURE.md",
+      "accessCount": 9,
+      "lastAccessed": 1773366806344,
+      "type": "file"
+    },
+    {
+      "path": "feature.md",
+      "accessCount": 9,
+      "lastAccessed": 1773366877286,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/bedrock.ts",
+      "accessCount": 9,
+      "lastAccessed": 1773377349373,
+      "type": "file"
+    },
+    {
+      "path": "src/app/creators/page.tsx",
+      "accessCount": 7,
+      "lastAccessed": 1773376296980,
+      "type": "file"
+    },
+    {
+      "path": "src/components/ProcessingStatus.tsx",
+      "accessCount": 7,
+      "lastAccessed": 1773376767090,
+      "type": "file"
+    },
+    {
+      "path": "src/components/SpeakerButton.tsx",
+      "accessCount": 6,
+      "lastAccessed": 1773377068604,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/types.ts",
+      "accessCount": 6,
+      "lastAccessed": 1773377306882,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/narrate/route.ts",
+      "accessCount": 4,
+      "lastAccessed": 1773377185570,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/pipeline.ts",
+      "accessCount": 4,
+      "lastAccessed": 1773377366621,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 3,
+      "lastAccessed": 1773370402114,
+      "type": "directory"
+    },
+    {
+      "path": "src/components/Mascots.tsx",
+      "accessCount": 3,
+      "lastAccessed": 1773376291236,
+      "type": "file"
+    },
+    {
+      "path": "src/app/layout.tsx",
+      "accessCount": 3,
+      "lastAccessed": 1773376502285,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/sonic.ts",
+      "accessCount": 3,
+      "lastAccessed": 1773377125303,
+      "type": "file"
+    },
+    {
+      "path": "src/app/icon.svg",
+      "accessCount": 2,
+      "lastAccessed": 1773376580707,
+      "type": "file"
+    },
+    {
+      "path": "package.json",
+      "accessCount": 1,
+      "lastAccessed": 1773366473864,
+      "type": "file"
+    },
+    {
+      "path": "src/components/VideoUploader.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1773366479006,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/upload/route.ts",
+      "accessCount": 1,
+      "lastAccessed": 1773366485073,
+      "type": "file"
+    },
+    {
+      "path": "src/components/StyleSwitcher.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1773366485686,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/restyle/route.ts",
+      "accessCount": 1,
+      "lastAccessed": 1773366487571,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/jobs/[jobId]/route.ts",
+      "accessCount": 1,
+      "lastAccessed": 1773366488035,
+      "type": "file"
+    },
+    {
+      "path": "solutions.md",
+      "accessCount": 1,
+      "lastAccessed": 1773366488459,
+      "type": "file"
+    },
+    {
+      "path": "src/components/LanguageToggle.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1773366492941,
+      "type": "file"
+    },
+    {
+      "path": "src/lib/canvas.ts",
+      "accessCount": 1,
+      "lastAccessed": 1773366493254,
+      "type": "file"
+    },
+    {
+      "path": "src/app/analyze/page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1773370402149,
+      "type": "file"
+    },
+    {
+      "path": "tailwind.config.ts",
+      "accessCount": 1,
+      "lastAccessed": 1773370405497,
+      "type": "file"
+    },
+    {
+      "path": "src/app/globals.css",
+      "accessCount": 1,
+      "lastAccessed": 1773370405730,
+      "type": "file"
+    },
+    {
+      "path": "img/core_family.png",
+      "accessCount": 1,
+      "lastAccessed": 1773375676959,
+      "type": "file"
+    },
+    {
+      "path": "src/lib",
+      "accessCount": 1,
+      "lastAccessed": 1773377354511,
+      "type": "directory"
+    }
+  ],
+  "userDirectives": []
+}

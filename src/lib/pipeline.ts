@@ -69,10 +69,10 @@ async function extractKeyframes(videoBuffer: Buffer, duration: number): Promise<
   try {
     videoPath = await saveVideoToTemp(videoBuffer);
 
-    // 2초 간격으로 키프레임 추출 (최대 15장)
-    const interval = Math.max(2, duration / 15);
+    // 0.5초 간격으로 키프레임 추출 (제한 없음)
+    const interval = 0.5;
     const timestamps: number[] = [];
-    for (let t = 0; t < duration && timestamps.length < 15; t += interval) {
+    for (let t = 0; t < duration; t += interval) {
       timestamps.push(t);
     }
 
@@ -156,7 +156,7 @@ export async function processVideo(
     await assertNotCancelled(jobId);
     await updateJob(jobId, {
       progress: 'analyzing_pass1_stepA',
-      progressDetail: 'Nova 2 Lite 대사/오디오 분석 중 (Step A)',
+      progressDetail: 'Nova 분석 파이프라인 시작 (Lite→Pro 듀얼 모델)',
     });
 
     console.log(`[Job ${jobId}] 개선된 분석 파이프라인 시작...`);
@@ -164,12 +164,10 @@ export async function processVideo(
     const analysis = await analyzeVideo(s3Uri, bucketOwner, async (stage) => {
       const stageMap: Record<string, { progress: string; detail: string }> = {
         pass1_stepA: { progress: 'analyzing_pass1_stepA', detail: 'Nova 2 Lite 대사/오디오 분석 중 (Step A: 화자 식별)' },
-        pass1_stepB_identify: { progress: 'analyzing_pass1_stepB_identify', detail: 'Nova 2 Lite 등장인물 식별 중 (Step B-0)' },
-        pass1_stepB_track: { progress: 'analyzing_pass1_stepB_track', detail: 'Nova 2 Lite 인물별 개별 행동 추적 중 (Step B-1)' },
-        pass1_stepB_merge: { progress: 'analyzing_pass1_stepB_merge', detail: 'Nova 2 Lite 행동 병합 + 인과관계 도출 중 (Step B-2)' },
-        pass1_stepC: { progress: 'analyzing_pass1_stepC', detail: 'Nova 2 Lite 종합 분석 중 (Step C)' },
-        verifying: { progress: 'verifying', detail: '반박 질문으로 분석 결과 검증 중' },
-        pass2: { progress: 'analyzing_pass2', detail: 'Nova 2 Lite 만화 패널 구조 추출 중 (Pass 2)' },
+        pass1_stepB: { progress: 'analyzing_pass1_stepB', detail: 'Nova 2 Lite 상호작용 분석 중 (Step B: 인과관계)' },
+        pass1_stepC: { progress: 'analyzing_pass1_stepC', detail: 'Nova 2 Pro 스토리 종합 중 (Step C: 스토리 아크)' },
+        verifying: { progress: 'verifying', detail: 'Nova 2 Pro 반박 질문으로 분석 결과 검증 중' },
+        pass2: { progress: 'analyzing_pass2', detail: 'Nova 2 Pro 만화 패널 구조 추출 중 (Pass 2)' },
       };
       const info = stageMap[stage];
       if (info) {
@@ -233,11 +231,13 @@ export async function processVideo(
       videoId: jobId,
       duration: analysis.duration,
       summary: analysis.summary,
+      summaryKo: analysis.summaryKo,
       climaxIndex: Math.min(analysis.climaxIndex, panelsWithImages.length - 1),
       panels: panelsWithImages,
       comicPageUrl,
       novaModelsUsed: [
-        'Nova 2 Lite (3-Step CoT 분석)',
+        'Nova 2 Lite (Step A/B 추출 분석)',
+        'Nova 2 Pro (Step C 스토리 종합 + Pass 2 패널 기획 + 반박 검증)',
         'AWS Transcribe (대사 추출)',
         'Nova Canvas (패널별 이미지 생성)',
       ],

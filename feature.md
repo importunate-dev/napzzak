@@ -2,7 +2,7 @@
 # https://www.youtube.com/shorts/hMhE7KvzZ8s
 ## 🔹 목표
 
-영상을 업로드하면 AI 2-Pass 분석을 통해 **스토리 기반 N컷 만화로 자동 변환**하는 서비스 구현
+영상을 업로드하면 AI **3단계 CoT(Chain-of-Thought) 분석** + 반박 검증을 통해 **스토리 기반 N컷 만화로 자동 변환**하는 서비스 구현
 
 ## 🔹 핵심 전략
 
@@ -12,7 +12,7 @@
 
 ## 🔹 최종 결과물
 
-하나의 영상 → 2-Pass 분석 → Story JSON → 패널별 이미지 + CSS 대사 오버레이
+하나의 영상 → 3단계 CoT 분석(Step A/B/C) + 반박 검증 → Story JSON → 패널별 이미지 + CSS 대사 오버레이 + 음성 내레이션
 
 ---
 
@@ -20,7 +20,7 @@
 
 ## 🔹 High-Level Architecture
 
-영상 업로드 → S3 저장 → Nova 2 Lite Pass 1 (심층 분석) → Nova 2 Lite Pass 2 (패널 구조) → Nova Canvas (패널별 이미지) → Story JSON → 프론트엔드 렌더링
+영상 업로드 → S3 저장 → Nova 2 Lite Step A/B (추출 분석) → Nova 2 Pro Step C (스토리 종합) → Nova 2 Pro 반박 검증 → Nova 2 Pro Pass 2 (패널 구조) → Nova Canvas (패널별 이미지) → Story JSON → 프론트엔드 렌더링 + Nova 2 Sonic (음성 내레이션, on-demand)
 
 ---
 
@@ -28,7 +28,7 @@
 
 ## 🔹 핵심 원칙
 
-* AI 분석은 **2-Pass** (심층 분석 → 패널 구조 추출)
+* AI 분석은 **3단계 CoT + 반박 검증** (Step A/B 추출 → Step C 종합 → 반박 검증 → Pass 2 패널 구조)
 * 이미지 생성은 **패널별 개별** (캐릭터 일관성 + 고품질)
 * 대사는 **CSS 오버레이** (AI 텍스트 렌더링 한계 해결)
 * Story JSON을 중심으로 모든 뷰가 동작
@@ -37,12 +37,17 @@
 ## 🔹 상세 처리 흐름
 
 1. 영상 → S3 업로드
-2. Nova 2 Lite Pass 1: 캐릭터 외모, 실제 대사, 전체 타임라인, 스토리 요약 추출
-3. Nova 2 Lite Pass 2: Pass 1 결과를 주입하여 4~6 패널 구조 + characterDescriptions 추출
-4. Nova Canvas × N: 각 패널 개별 이미지 생성 (characterDescriptions 공통 주입)
-5. Nova Canvas × 1: 통합 만화 페이지 생성 (폴백)
-6. Story JSON 생성 → S3 + DynamoDB 저장
-7. 프론트엔드: 패널 그리드 + CSS 대사 오버레이 렌더링
+2. AWS Transcribe: 대사 추출 + 화자 분리
+3. ffmpeg: 0.5초 간격 키프레임 추출
+4. Nova 2 Lite Step A: 대사/오디오 검증 (화자 식별)
+5. Nova 2 Lite Step B: 행동 순서 + 인과관계 분석
+6. Nova 2 Pro Step C: Step A + Step B 결과를 종합하여 스토리 아크 생성
+7. Nova 2 Pro 반박 검증: 6가지 adversarial 질문으로 분석 오류 교정
+8. Nova 2 Pro Pass 2: 검증된 분석으로 4~6 패널 구조 + characterDescriptions 추출
+9. Nova Canvas × N: 각 패널 개별 이미지 생성 (characterDescriptions 공통 주입)
+10. Nova Canvas × 1: 통합 만화 페이지 생성 (폴백)
+11. Story JSON 생성 → S3 + DynamoDB 저장
+12. 프론트엔드: 패널 그리드 + CSS 대사 오버레이 + 음성 내레이션(on-demand) 렌더링
 
 ---
 
@@ -125,7 +130,7 @@
 
 ## 🔹 4. 상태 관리
 
-* 6단계 progress: uploaded → analyzing_pass1 → analyzing_pass2 → generating_panels → generating_comic → completed
+* 10단계 progress: uploaded → transcribing → extracting_frames → analyzing_pass1_stepA → analyzing_pass1_stepB → analyzing_pass1_stepC → verifying → analyzing_pass2 → generating_panels → generating_comic → completed
 * DynamoDB 기반 Job 상태
 
 ---
@@ -140,11 +145,14 @@
 
 # 8. 🔥 차별화 포인트
 
-1. **2-Pass 심층 분석:** 오디오+비주얼 종합 이해 후 패널 구성 (맥락 정확도 대폭 향상)
-2. **패널별 개별 생성:** 캐릭터 외모 일관성 + 각 패널 고품질 이미지
-3. **CSS 대사 오버레이:** AI 이미지 텍스트 렌더링 한계를 구조적으로 해결
-4. **Nova 4중 활용:** 분석(Lite) + 생성(Canvas) + 음성(Sonic) + 임베딩(Embeddings)
-5. **프론트 중심 레이아웃 엔진:** View Layer에서 데이터 재해석
+1. **3단계 CoT 심층 분석:** Step A(대사) → Step B(행동) → Step C(종합) 순차 분석 + 반박 검증
+2. **듀얼 모델 전략:** Nova 2 Lite(빠른 추출) + Nova 2 Pro(고급 추론) 역할 분리
+3. **패널별 개별 생성:** 캐릭터 외모 일관성 + 각 패널 고품질 이미지
+4. **CSS 대사 오버레이:** AI 이미지 텍스트 렌더링 한계를 구조적으로 해결
+5. **Nova 5중 활용:** 분석(Lite + Pro) + 생성(Canvas) + 음성(Sonic) + 대사추출(Transcribe)
+6. **음성 내레이션:** Nova 2 Sonic으로 대사 음성 재생 (on-demand)
+7. **마스코트 캐릭터:** 납서(문어) + 짝이(너구리) 납짝 애니메이션
+8. **프론트 중심 레이아웃 엔진:** View Layer에서 데이터 재해석
 
 ---
 
@@ -158,4 +166,4 @@
 
 # 10. 📌 핵심 한 줄 요약
 
-> **영상 → 2-Pass AI 심층 분석 → 패널별 이미지 생성 → CSS 대사 오버레이로 정확한 N컷 만화 렌더링**
+> **영상 → 3단계 CoT AI 심층 분석 + 반박 검증 → 패널별 이미지 생성 → CSS 대사 오버레이 + 음성 내레이션으로 정확한 N컷 만화 렌더링**

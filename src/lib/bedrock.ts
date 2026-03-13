@@ -8,7 +8,11 @@ import {
 import type { TranscribeResult } from '@/lib/transcribe';
 
 const REGION = process.env.AWS_REGION || 'us-east-1';
-const MODEL_ID = 'us.amazon.nova-2-lite-v1:0';
+
+// 단순 추출용 (Step A, B-0) — 빠르고 저렴
+const LITE_MODEL_ID = 'us.amazon.nova-2-lite-v1:0';
+// 스토리 종합 및 패널 기획용 (Step C, Pass 2, Verify) — 고급 추론
+const PRO_MODEL_ID = 'us.amazon.nova-pro-v1:0';
 
 const bedrockClient = new BedrockRuntimeClient({ region: REGION });
 
@@ -23,6 +27,12 @@ export interface VideoDeepAnalysis {
     appearance: string;
     role: string;
   }>;
+  storyArc: {
+    setup: string;
+    incitingIncident: string;
+    climax: string;
+    resolution: string;
+  };
   timeline: Array<{
     timeRange: string;
     description: string;
@@ -38,6 +48,7 @@ export interface VideoDeepAnalysis {
 export interface NovaAnalysisResult {
   duration: number;
   summary: string;
+  summaryKo?: string;
   climaxIndex: number;
   hasAudioDialogue: boolean;
   characterDescriptions: string;
@@ -95,6 +106,7 @@ function buildFrameContentBlocks(frameImages: string[]): ContentBlock[] {
   } as ContentBlock));
 }
 
+
 // ─────────────────────────────────────────────
 // Pass 1 Step A: 대사/오디오 검증
 // ─────────────────────────────────────────────
@@ -110,17 +122,40 @@ async function stepA_DialogueVerification(
     : '';
 
   const systemPrompt: SystemContentBlock = {
-    text: `You are a forensic video-audio analyst. Your SOLE job is to determine EXACTLY who speaks each line of dialogue.
+    text: `You are a forensic video-audio analyst. Your job is to determine EXACTLY who produces each sound — both spoken dialogue AND non-verbal vocal sounds.
 
 METHODOLOGY - you MUST follow these steps:
 1. First, LIST every person visible in the video by their appearance (e.g., "Person A: woman with dark hair in brown top", "Person B: man in blue shirt sitting at table").
-2. For each line of dialogue, CHECK who is speaking by observing:
-   - LIP MOVEMENTS: Whose mouth is moving when the words are heard?
-   - CAMERA FOCUS: Is the camera showing the speaker or the listener?
-   - BODY LANGUAGE: Who is gesturing while speaking?
-   - SPATIAL POSITION: Where is the sound coming from relative to the people?
-3. NEVER assume the person shown on screen is the speaker — sometimes the camera shows the LISTENER's reaction.
-4. If Transcribe labels are provided (spk_0, spk_1), create a MAPPING TABLE: "spk_0 = [Person by appearance]", "spk_1 = [Person by appearance]".
+2. For each sound heard in the video, CLASSIFY it:
+   - SPOKEN DIALOGUE: actual words/sentences
+   - VOCAL MIMICRY: a person imitating a sound with their voice (e.g., imitating a phone ringtone, doorbell, siren, animal sound, another person's voice, beatboxing). This is a DELIBERATE ACTION by the person — treat it as something they DID, not just background noise.
+   - NON-VERBAL VOCAL SOUNDS: gasps, laughter, screams, sighs, grunts
+   - ENVIRONMENTAL SOUNDS: actual phone ringing, door slamming, music (NOT produced by a person's voice)
+3. For each sound, determine WHO produced it using this evidence hierarchy:
+   PRIMARY EVIDENCE (use first):
+   - LIP MOVEMENTS: Whose mouth is moving when the sound is heard?
+   - CAMERA FOCUS: Is the camera showing the sound producer or someone reacting?
+
+   WHEN LIP MOVEMENTS ARE NOT VISIBLE (e.g., camera shows only one person but the sound comes from off-screen or another person):
+   - REACTION ANALYSIS: If the person ON SCREEN looks surprised, startled, confused, or turns toward the sound → they are the LISTENER, NOT the producer. The sound was made by someone ELSE (possibly off-screen or partially visible).
+   - GAZE DIRECTION: If someone looks toward another person right when the sound plays → the sound likely came from that direction.
+   - BODY LANGUAGE TIMING: The person who made the sound often shows anticipation (smirking, leaning in, watching for reaction) BEFORE or DURING the sound. The person who HEARS the sound shows reaction AFTER.
+   - PROCESS OF ELIMINATION: If Person A is clearly reacting to a sound (startled, confused), then Person A did NOT make the sound → it must be Person B.
+   - SUBSEQUENT BEHAVIOR: After the sound, who looks amused/satisfied (= producer) vs. who looks confused/annoyed (= receiver)?
+
+4. CRITICAL — VOCAL MIMICRY DETECTION: If a sound COULD be either real (environmental) or a person imitating it with their voice, check:
+   - Does the sound quality suggest it's vocal (slightly imperfect, human-like) rather than electronic?
+   - REACTION TEST: Does someone react with surprise (= they didn't make it) while another person watches with amusement (= they DID make it)?
+   - Is this part of a prank or joke setup?
+   - If lip movements are NOT visible for any person: use reaction analysis — the person who reacts with surprise/confusion is the TARGET, not the source.
+5. NEVER assume the person shown on screen is the speaker — sometimes the camera shows the LISTENER's reaction. This is ESPECIALLY true in prank/comedy videos where the camera focuses on the VICTIM's reaction while the prankster acts off-screen.
+6. ZERO GENDER BIAS: Do NOT assume men are more likely to be pranksters or initiators. Women prank men just as often. Determine who produced a sound based on EVIDENCE (lip movements, reactions, gaze), not stereotypes.
+7. SUBJECT ATTRIBUTION — DOUBLE-CHECK: After your initial analysis, ask yourself:
+   - "Did I actually SEE this person's mouth move, or did I just assume because they were on camera?"
+   - "Is the person on screen REACTING to the sound (= listener) or PRODUCING it (= speaker)?"
+   - "If I assigned the sound to Person A, does Person A show a REACTION (surprise, confusion)? If yes, Person A is probably the LISTENER, not the producer — reassign to Person B."
+   If you cannot determine the producer with confidence, state it explicitly and explain your reasoning.
+8. If Transcribe labels are provided (spk_0, spk_1), create a MAPPING TABLE: "spk_0 = [Person by appearance]", "spk_1 = [Person by appearance]".
 
 Respond in plain text (NOT JSON). Be detailed and precise.`,
   };
@@ -130,7 +165,7 @@ Respond in plain text (NOT JSON). Be detailed and precise.`,
   ];
 
   if (frameImages && frameImages.length > 0) {
-    contentBlocks.push(...buildFrameContentBlocks(frameImages.slice(0, 5)));
+    contentBlocks.push(...buildFrameContentBlocks(frameImages));
   }
 
   contentBlocks.push({
@@ -139,31 +174,43 @@ Respond in plain text (NOT JSON). Be detailed and precise.`,
 STEP 1 - CHARACTER INVENTORY:
 List every person visible. Describe each by appearance ONLY (hair, clothing, body type, position).
 
-STEP 2 - SPEAKER MAPPING:
-For EACH line of dialogue:
+STEP 2 - COMPLETE AUDIO INVENTORY:
+List ALL sounds heard in the video chronologically. For EACH sound:
+- Timestamp
+- Type: SPOKEN DIALOGUE / VOCAL MIMICRY / NON-VERBAL VOCAL / ENVIRONMENTAL
+- If VOCAL MIMICRY: What sound is being imitated? (e.g., "phone ringtone", "doorbell", "animal sound")
+- WHO produced it (check lip movements!)
+- WHY they made this sound (prank setup, joke, communication, etc.)
+
+IMPORTANT: A person imitating a phone ringtone, siren, or other sound effect with their VOICE is a VOCAL MIMICRY — this is a deliberate ACTION by that person. Do NOT classify it as environmental sound or ignore it. This is often the KEY ACTION that triggers the entire scene.
+
+STEP 3 - CONTEXTUAL SPEAKER INFERENCE:
+For EACH line of spoken dialogue:
 - Quote the exact words spoken
 - State the timestamp
 - Identify the speaker by APPEARANCE (check lip movements!)
+- ALSO infer the speaker from DIALOGUE CONTENT: Based on the tone, vocabulary, and topic of the utterance, does this sound like something the [pranking person] would say or the [reacting person]? Cross-reference with visual cues.
 - State your CONFIDENCE (high/medium/low) and WHY you think this person is the speaker
 - Note: the person SHOWN on screen may be the LISTENER, not the speaker
 
-STEP 3 - SPEAKER LABEL MAPPING (if Transcribe data provided):
+STEP 4 - SPEAKER LABEL MAPPING (if Transcribe data provided):
 Create a table mapping Transcribe speaker IDs to visual characters:
 - spk_0 = [describe person by appearance]
 - spk_1 = [describe person by appearance]
-Explain your reasoning for each mapping.
+For each mapping, consider: "Given the CONTENT of what spk_0 says (tone, topic, role in conversation), which visible person is most likely to have said this?" Combine lip movement evidence with dialogue content reasoning.
 
-STEP 4 - DIALOGUE CONTEXT:
-For each line, also note:
+STEP 5 - DIALOGUE & SOUND CONTEXT:
+For each line/sound, also note:
 - The TONE (angry, playful, surprised, mocking, etc.)
-- Who they are speaking TO
-- Whether the dialogue is MIMICRY/IMITATION of someone else's voice or genuine speech
-- Any NON-VERBAL sounds (gasps, laughter, thuds, etc.)`,
+- Who they are speaking/performing TO
+- Whether it is MIMICRY/IMITATION (of a sound or another person's voice) or genuine speech
+- Any NON-VERBAL sounds (gasps, laughter, thuds, etc.)
+- CAUSE-EFFECT: Did this sound/dialogue TRIGGER another person's reaction? (e.g., "Person A imitates ringtone → Person B pretends to answer phone")`,
   } as ContentBlock);
 
   const response = await bedrockClient.send(
     new ConverseCommand({
-      modelId: MODEL_ID,
+      modelId: LITE_MODEL_ID,
       messages: [{ role: 'user', content: contentBlocks }],
       system: [systemPrompt],
       inferenceConfig: { maxTokens: 4096, temperature: 0.2, topP: 0.9 },
@@ -176,189 +223,89 @@ For each line, also note:
 }
 
 // ─────────────────────────────────────────────
-// Pass 1 Step B: 인물별 개별 행동 추적 + 인과관계
+// Pass 1 Step B: 상호작용 중심 행동 분석 (인물 간 인과관계 포커스)
 // ─────────────────────────────────────────────
 
-/** B-0: 등장인물 목록 추출 (짧은 호출) */
-async function stepB0_IdentifyCharacters(
-  s3Uri: string,
-  bucketOwner: string,
-  frameImages?: string[]
-): Promise<string[]> {
-  const contentBlocks: ContentBlock[] = [
-    buildVideoContentBlock(s3Uri, bucketOwner),
-  ];
-
-  if (frameImages && frameImages.length > 0) {
-    contentBlocks.push(...buildFrameContentBlocks(frameImages.slice(0, 3)));
-  }
-
-  contentBlocks.push({
-    text: `List every person who appears in this video.
-For each person, provide ONLY a short visual description of their appearance (clothing, hair, build).
-Format: one person per line, like:
-- man in light blue shirt and dark vest
-- woman in white shirt and blue jeans
-
-ONLY list people. No other text.`,
-  } as ContentBlock);
-
-  const response = await bedrockClient.send(
-    new ConverseCommand({
-      modelId: MODEL_ID,
-      messages: [{ role: 'user', content: contentBlocks }],
-      system: [{ text: 'List all people visible in the video by their appearance. One per line. No extra text.' }],
-      inferenceConfig: { maxTokens: 1024, temperature: 0.1, topP: 0.9 },
-    })
-  );
-
-  const text = extractTextFromResponse(response);
-  // 각 줄에서 인물 설명 추출
-  const characters = text
-    .split('\n')
-    .map(line => line.replace(/^[-*•]\s*/, '').trim())
-    .filter(line => line.length > 3);
-
-  console.log(`[Nova Step B-0] ${characters.length}명 인물 식별: ${characters.join(' / ')}`);
-  return characters;
-}
-
-/** B-1: 특정 인물 한 명의 행동만 추적 */
-async function stepB1_TrackSingleCharacter(
-  s3Uri: string,
-  bucketOwner: string,
-  characterDesc: string,
-  frameImages?: string[]
-): Promise<string> {
-  const contentBlocks: ContentBlock[] = [
-    buildVideoContentBlock(s3Uri, bucketOwner),
-  ];
-
-  if (frameImages && frameImages.length > 0) {
-    contentBlocks.push(...buildFrameContentBlocks(frameImages.slice(0, 5)));
-  }
-
-  contentBlocks.push({
-    text: `TARGET PERSON: "${characterDesc}"
-
-Watch the ENTIRE video and track ONLY this person. Ignore all other people.
-
-For this person ONLY, answer:
-1. STARTING POSITION: Where are they at the very beginning? (sitting/standing, where in the room, facing which direction)
-2. TIMELINE OF ACTIONS: List every action this person takes, in chronological order:
-   [TIME] → [action] (describe hands, body movement, facial expression)
-3. MOVEMENT PATH: Do they move from one place to another? Where do they walk to?
-4. HAND ACTIONS: What do their hands do? (pick up object, gesture, hold phone, wave, point, touch someone, etc.)
-5. FACIAL EXPRESSIONS: What emotions do they show and when? (calm → surprised → angry, etc.)
-6. INTERACTIONS: Do they approach anyone? Touch anyone? Look at anyone?
-7. PRETEND ACTIONS: Do they pretend/mime/imitate anything? If so, what exactly do they pretend to do?
-
-IMPORTANT: Report ONLY what "${characterDesc}" does. Do NOT describe other people's actions.`,
-  } as ContentBlock);
-
-  const response = await bedrockClient.send(
-    new ConverseCommand({
-      modelId: MODEL_ID,
-      messages: [{ role: 'user', content: contentBlocks }],
-      system: [{
-        text: `You are tracking a single person in a video. Focus EXCLUSIVELY on the person described as "${characterDesc}". Report only their actions, movements, and expressions. Ignore everyone else. Be precise about hand movements and body position.`,
-      }],
-      inferenceConfig: { maxTokens: 2048, temperature: 0.2, topP: 0.9 },
-    })
-  );
-
-  return extractTextFromResponse(response);
-}
-
-/** B-2: 개별 추적 결과를 종합하여 인과관계 도출 */
-async function stepB2_MergeAndCausation(
-  s3Uri: string,
-  bucketOwner: string,
-  characterTrackings: Array<{ character: string; tracking: string }>
-): Promise<string> {
-  const trackingReport = characterTrackings
-    .map(ct => `=== TRACKING: "${ct.character}" ===\n${ct.tracking}\n=== END ===`)
-    .join('\n\n');
-
-  const contentBlocks: ContentBlock[] = [
-    buildVideoContentBlock(s3Uri, bucketOwner),
-    {
-      text: `Below are INDEPENDENT tracking reports for each person in this video.
-Each report tracks ONLY that person's actions. Now compare them to find cause-effect relationships.
-
-${trackingReport}
-
-Based on the individual tracking reports above, determine:
-
-1. TIMELINE MERGE: Interleave all actions into a single chronological timeline.
-   Format: [TIME] [Person] → [Action]
-
-2. CAUSE → EFFECT:
-   For each reaction, identify what CAUSED it:
-   - CAUSE: "[Person A description] did [X]"
-   - EFFECT: "[Person B description] reacted with [Y]"
-   - EVIDENCE: Which tracking report confirms this?
-
-3. WHO IS THE INITIATOR?
-   - Who performs an action FIRST that triggers a reaction in someone else?
-   - Who is acting vs who is reacting?
-
-4. PRETEND/PRANK ACTIONS:
-   - If one person pretends to do something (e.g., mimics a phone call), state clearly:
-     "The [person description] PRETENDS to [action]. This is NOT real."
-   - Who is the prankster and who is the target?
-
-5. EMOTIONAL FLOW:
-   For each person, describe their emotional arc:
-   [Person description]: [emotion at start] → [trigger event] → [emotion change] → [final emotion]`,
-    } as ContentBlock,
-  ];
-
-  const response = await bedrockClient.send(
-    new ConverseCommand({
-      modelId: MODEL_ID,
-      messages: [{ role: 'user', content: contentBlocks }],
-      system: [{
-        text: `You are merging per-character tracking reports into a unified timeline with cause-effect analysis. The individual reports are the ground truth for each person's actions — trust them. Your job is to find how one person's action triggered another person's reaction. Respond in plain text.`,
-      }],
-      inferenceConfig: { maxTokens: 4096, temperature: 0.2, topP: 0.9 },
-    })
-  );
-
-  return extractTextFromResponse(response);
-}
-
-/** Step B 통합: 인물별 추적 → 병합 → 인과관계 */
+/** Step B: 인물 간 상호작용 + 감정 변화 + 인과관계를 시간순으로 분석 */
 async function stepB_ActionSequenceAnalysis(
   s3Uri: string,
   bucketOwner: string,
   frameImages?: string[]
 ): Promise<string> {
-  // B-0: 인물 식별
-  const characters = await stepB0_IdentifyCharacters(s3Uri, bucketOwner, frameImages);
+  const contentBlocks: ContentBlock[] = [
+    buildVideoContentBlock(s3Uri, bucketOwner),
+  ];
 
-  if (characters.length === 0) {
-    console.warn('[Nova Step B] 인물 미식별, 폴백으로 전체 분석');
-    characters.push('the main person in the video');
+  if (frameImages && frameImages.length > 0) {
+    contentBlocks.push(...buildFrameContentBlocks(frameImages));
   }
 
-  // B-1: 인물별 개별 추적 (최대 4명)
-  const trackTargets = characters.slice(0, 4);
-  const trackings: Array<{ character: string; tracking: string }> = [];
+  contentBlocks.push({
+    text: `Watch the ENTIRE video from beginning to end and analyze the INTERACTIONS between people.
 
-  for (const char of trackTargets) {
-    console.log(`[Nova Step B-1] "${char}" 추적 중...`);
-    const tracking = await stepB1_TrackSingleCharacter(s3Uri, bucketOwner, char, frameImages);
-    trackings.push({ character: char, tracking });
-    console.log(`[Nova Step B-1] "${char}" 추적 완료 (${tracking.length}자)`);
-  }
+STEP 1 - CHARACTER INVENTORY:
+List every person visible. Describe each by appearance ONLY (hair, clothing, body type, position).
 
-  // B-2: 병합 + 인과관계 도출
-  console.log('[Nova Step B-2] 개별 추적 결과 병합 중...');
-  const merged = await stepB2_MergeAndCausation(s3Uri, bucketOwner, trackings);
-  console.log(`[Nova Step B] 행동 순서 분석 완료 (${merged.length}자)`);
+STEP 2 - INTERACTION TIMELINE:
+Record all interactions between characters in chronological order. Focus on WHO does WHAT to WHOM:
+Format: [TIME] [Person A description] → [action] → [Person B description] [reaction]
 
-  return merged;
+IMPORTANT — "actions" include VOCAL ACTIONS:
+- A person imitating a sound (e.g., making a phone ringtone sound with their mouth, imitating a doorbell, mimicking an animal) is an ACTION performed BY that person.
+- Vocal mimicry/sound effects made by a person are often the INITIATING ACTION that triggers the entire scene (e.g., Person A makes ringtone sound → Person B pretends to answer phone).
+- Do NOT treat vocal mimicry as background noise — it is a deliberate action by a specific person.
+
+For EACH interaction, note:
+- What is the INITIATING action? (who starts it — this could be a vocal action like imitating a sound!)
+- What is the RESPONSE/REACTION? (how the other person responds)
+- What CAUSED this interaction? (why did it happen at this moment)
+
+HOW TO IDENTIFY THE INITIATOR vs REACTOR:
+- The INITIATOR acts FIRST and often shows anticipation (smirking, watching for reaction)
+- The REACTOR shows surprise, confusion, or annoyance AFTER the initiating action
+- If the camera shows Person A reacting with surprise to a sound → Person A is the REACTOR, and the sound was made by someone else (the INITIATOR)
+- Do NOT assume the person on camera is the initiator — the camera often focuses on the REACTOR's face for comedic/dramatic effect
+
+STEP 3 - STORY STRUCTURE:
+Identify the narrative structure:
+- INCITING INCIDENT: The exact moment the conflict/comedy/drama BEGINS. What specific action triggers the story? (e.g., "Person A suddenly grabs Person B's phone")
+- ESCALATION: How does the situation develop? What makes it more intense?
+- CLIMAX: The peak moment — the most dramatic/funny/important action
+- RESOLUTION: How does it end? What are the final emotions?
+
+STEP 4 - CAUSE → EFFECT CHAIN:
+List every cause-effect pair:
+- CAUSE: "[Person by appearance] did [specific action]"
+- EFFECT: "[Other person by appearance] reacted with [specific reaction]"
+- WHY: What about the cause triggered this specific effect?
+
+STEP 5 - PRETEND vs REAL:
+If anyone PRETENDS/FAKES an action (e.g., pretending to be on the phone, faking a hit, imitating a sound):
+- State clearly: "[Person] PRETENDS to [action]. This is NOT real."
+- Who is the prankster and who is the target?
+- VOCAL PRANKS: If someone imitates a sound (ringtone, doorbell, etc.) to trick another person into reacting, this is a VOCAL PRANK. The person making the fake sound is the PRANKSTER/INITIATOR.
+
+STEP 6 - EMOTIONAL ARCS:
+For each person, describe their emotional journey:
+[Person description]: [emotion at start] → [trigger event] → [emotion change] → [final emotion]
+
+IMPORTANT: Always describe interactions as "Person A does X TO/AT Person B" — never analyze people in isolation. The story lives in the SPACE BETWEEN characters.`,
+  } as ContentBlock);
+
+  const response = await bedrockClient.send(
+    new ConverseCommand({
+      modelId: LITE_MODEL_ID,
+      messages: [{ role: 'user', content: contentBlocks }],
+      system: [{
+        text: `You are an expert at analyzing human interactions in video. Your focus is on the RELATIONSHIPS and INTERACTIONS between people, not individuals in isolation. Always describe WHO does WHAT to WHOM and WHY. Pay special attention to cause-effect chains and the narrative arc (inciting incident → climax → resolution). Remember: "actions" include VOCAL ACTIONS — a person imitating a sound (phone ringtone, doorbell, etc.) with their voice is performing a deliberate action that can trigger other people's reactions. CRITICAL: Do NOT assume gender roles — anyone can be the prankster or initiator regardless of gender. Determine WHO initiates ONLY by observing their actual physical actions and lip movements. Respond in plain text.`,
+      }],
+      inferenceConfig: { maxTokens: 4096, temperature: 0.2, topP: 0.9 },
+    })
+  );
+
+  const text = extractTextFromResponse(response);
+  console.log(`[Nova Step B] 상호작용 분석 완료 (${text.length}자)`);
+  return text;
 }
 
 // ─────────────────────────────────────────────
@@ -385,6 +332,7 @@ ABSOLUTE PRIORITY RULES for resolving conflicts:
 3. WHAT was said → Trust Transcribe ground truth (if provided), then Step A
 4. CAUSE → EFFECT order → Trust Step B's merged timeline and cause-effect analysis
 5. If Step A says "Person X spoke" but Step B's individual tracking of Person X shows their mouth was closed → trust Step B
+6. ZERO GENDER BIAS: Do NOT default to "man = prankster, woman = reactor". Read Step A and Step B carefully — if they say the WOMAN initiated the action, then the woman is the initiator. Trust the evidence from the analysis steps, not stereotypes.
 
 You MUST respond with valid JSON only. No markdown, no explanation, no extra text.`,
   };
@@ -404,10 +352,12 @@ ${stepBResult}
 
 SYNTHESIS RULES:
 1. For "speakers" field: Use Step A's speaker-to-appearance mapping. Each speaker must be identified by their VISUAL APPEARANCE.
-2. For "description" field: Use Step B's PER-CHARACTER tracking results. Step B tracked each person SEPARATELY, so if Step B says "the woman in white shirt" did something, that is RELIABLE because the model was ONLY watching that person.
-3. If Step A and Step B conflict about WHO does an action, ALWAYS trust Step B's per-character tracking (it cannot confuse subjects because it tracks one person at a time).
+2. For "description" field: Use Step B's interaction analysis. Step B analyzed interactions between people, so trust its cause-effect findings.
+3. If Step A and Step B conflict about WHO does an action, trust Step B's interaction analysis.
 4. Pay special attention to Step B's PRETEND/PRANK analysis and CAUSE → EFFECT chain.
 5. For pretend/mimicry actions: clearly state WHO is pretending and that it is pretend, not real.
+6. You MUST fill in the "storyArc" field to structure the story as a proper narrative (기승전결).
+7. VOCAL MIMICRY AS ACTION: If Step A or Step B identifies someone imitating a sound (e.g., phone ringtone, doorbell) with their voice, this MUST appear in the timeline as a distinct action by that person. It is often the INCITING INCIDENT that triggers the entire scene. Include it in the timeline description (e.g., "Woman imitates phone ringtone sound with her voice") and in the cause-effect chain.
 
 Return JSON:
 {
@@ -421,6 +371,12 @@ Return JSON:
       "role": "<role: initiator/prankster/reactor/victim/observer/etc.>"
     }
   ],
+  "storyArc": {
+    "setup": "<초기 상황 설명 — 평온한 상태, 인물들의 위치와 분위기>",
+    "incitingIncident": "<사건의 발단 — 갈등/오해/문제가 시작되는 구체적 행동>",
+    "climax": "<갈등이 폭발하거나 가장 중요한 행동이 일어나는 순간>",
+    "resolution": "<결과 및 감정적 마무리>"
+  },
   "timeline": [
     {
       "timeRange": "<e.g. '0:00-0:10'>",
@@ -429,14 +385,17 @@ Return JSON:
       "dialogue": "<VERBATIM dialogue — attributed to correct speaker from Step A>"
     }
   ],
-  "fullStorySummary": "<comprehensive summary: WHO (by appearance) initiates WHAT action → WHO reacts HOW → final outcome. MUST include correct cause-effect chain from Step B. Minimum 80 characters.>",
+  "fullStorySummary": "<Based on storyArc above, write this as ONE COHESIVE STORY — not a CCTV log. Format: [Setup] → [Inciting Incident] → [Climax] → [Resolution]. WHO (by appearance) initiates WHAT action → WHO reacts HOW → final outcome. MUST include correct cause-effect chain from Step B. Minimum 100 characters.>",
   "keyMoments": ["<moment with correct subject attribution>", "..."]
 }
 
 FINAL CHECK before responding:
+- Does storyArc.incitingIncident correctly identify the TRIGGER moment from Step B? (If someone imitated a sound to start the scene, THAT is the inciting incident, not the reaction to it.)
+- Does storyArc.climax match the peak dramatic moment from Step B?
+- VOCAL MIMICRY CHECK: If Step A identified any vocal mimicry (sound imitation), is it included in the timeline as a separate action? Is the correct person credited as the one who made the fake sound?
 - For each timeline entry, verify: Is the SUBJECT of the action the same person Step B identified?
 - For each dialogue, verify: Is the SPEAKER the same person Step A identified via lip movements?
-- Does fullStorySummary correctly state who is the prankster and who is the victim (if applicable)?`,
+- Does fullStorySummary read like a SHORT STORY, not a security camera log?`,
     } as ContentBlock,
   ];
 
@@ -446,7 +405,7 @@ FINAL CHECK before responding:
     try {
       const response = await bedrockClient.send(
         new ConverseCommand({
-          modelId: MODEL_ID,
+          modelId: PRO_MODEL_ID,
           messages: [{ role: 'user', content: contentBlocks }],
           system: [systemPrompt],
           inferenceConfig: { maxTokens: 8192, temperature: 0.2, topP: 0.9 },
@@ -458,6 +417,7 @@ FINAL CHECK before responding:
 
       if (!result.characters) result.characters = [];
       if (!result.timeline) result.timeline = [];
+      if (!result.storyArc) result.storyArc = { setup: '', incitingIncident: '', climax: '', resolution: '' };
 
       console.log(`[Nova Step C] 종합 완료: ${result.characters.length}명, ${result.timeline.length}개 세그먼트`);
       return result;
@@ -554,13 +514,21 @@ Answer these adversarial questions by re-watching the video:
 
 1. SPEAKER ATTRIBUTION: For each line of dialogue, verify WHO actually said it. Could the speaker be someone else? Check lip movements.
 
-2. ACTION REVERSAL TEST: If you swap the subject and object of each action (e.g., "A pranks B" → "B pranks A"), does the SWAPPED version actually match the video better? If yes, the original analysis has the wrong subject.
+2. ACTION REVERSAL TEST: For EACH action in the analysis, try swapping the subject and object (e.g., "Man pranks Woman" → "Woman pranks Man"). Re-watch the video and ask: does the SWAPPED version match the video better? Check the actual lip movements and body language — NOT your assumptions about who is "more likely" to do it. If the swapped version fits better, the original has the wrong subject.
 
-3. CAUSE-EFFECT CHECK: For each event, is the stated cause actually what triggered it? Or did something else happen first? Could the cause-effect be reversed?
+3. CAUSE-EFFECT CHECK: For each event, is the stated cause actually what triggered it? Or did something else happen first? Could the cause-effect be reversed? Pay special attention to WHO initiates — re-watch the first few seconds carefully to see who acts FIRST.
+
+GENDER BIAS WARNING: Do NOT assume men are pranksters and women are victims/observers. The video may show the opposite. Trust ONLY what you SEE (lip movements, body language, timing of actions).
 
 4. PRETEND vs REAL: Are any actions in the video PRETENDED/FAKED (e.g., pretending to be on the phone)? Does the analysis correctly distinguish pretend actions from real ones?
 
 5. DIALOGUE-ACTION CONSISTENCY: Does each person's dialogue match their actions? If someone says "What are you doing?" are they the one performing the action or observing someone else's action?
+
+6. VOCAL MIMICRY CHECK: Listen carefully — does anyone IMITATE a sound with their voice (e.g., phone ringtone, doorbell, siren, animal sound)? If so:
+   - Is this vocal mimicry included in the timeline as a distinct action?
+   - Is the CORRECT person credited as the one who made the fake sound?
+   - Is it correctly identified as the CAUSE/TRIGGER for other people's reactions?
+   - A person imitating a ringtone to make someone else answer the phone is a PRANK — the imitator is the prankster, not the person who answers.
 
 After answering these questions, return the CORRECTED analysis as JSON with the same structure. Fix any errors you found. If the analysis is correct, return it unchanged.`,
       } as ContentBlock,
@@ -570,7 +538,7 @@ After answering these questions, return the CORRECTED analysis as JSON with the 
   try {
     const response = await bedrockClient.send(
       new ConverseCommand({
-        modelId: MODEL_ID,
+        modelId: PRO_MODEL_ID,
         messages: [userMessage],
         system: [systemPrompt],
         inferenceConfig: { maxTokens: 8192, temperature: 0.2, topP: 0.9 },
@@ -619,6 +587,10 @@ async function extractPanelStructure(
     .map((m, i) => `  ${i + 1}. ${m}`)
     .join('\n');
 
+  const storyArcBriefing = deepAnalysis.storyArc
+    ? `\nStory Arc (기승전결):\n  Setup: ${deepAnalysis.storyArc.setup}\n  Inciting Incident: ${deepAnalysis.storyArc.incitingIncident}\n  Climax: ${deepAnalysis.storyArc.climax}\n  Resolution: ${deepAnalysis.storyArc.resolution}\n`
+    : '';
+
   const analysisContext = `=== VIDEO ANALYSIS BRIEFING ===
 Genre: ${deepAnalysis.genre}
 Duration: ${deepAnalysis.duration}s
@@ -626,7 +598,7 @@ Has Audio Dialogue: ${deepAnalysis.hasAudioDialogue}
 
 Characters:
 ${characterBriefing}
-
+${storyArcBriefing}
 Full Story:
 ${deepAnalysis.fullStorySummary}
 
@@ -640,6 +612,12 @@ ${timelineBriefing}
   const systemPrompt: SystemContentBlock = {
     text: `You are a comic book artist who converts video stories into comic panels.
 You have already analyzed this video in detail. Use the provided analysis to create accurate comic panels.
+
+IMPORTANT: The analysis contains the TRUE story — trust it completely. Pay special attention to:
+- The storyArc (especially incitingIncident) — this is the TRIGGER moment that must be shown
+- The cause-effect chain in the timeline — panels must reflect WHO actually initiates each action
+- Vocal mimicry/sound imitation — if someone imitates a sound to prank someone, this is a KEY MOMENT that deserves its own panel
+- The "summary" field must capture the CORE joke/drama accurately (who does what to whom)
 
 The comic will be SILENT (no text in images), but dialogue will be overlaid separately by the frontend.
 So you must still extract the key dialogue for each panel.
@@ -664,7 +642,8 @@ Now create 4 to 6 comic panels that tell this story visually.
 Return JSON with this exact structure:
 {
   "duration": ${deepAnalysis.duration},
-  "summary": "<one-line English summary of the story>",
+  "summary": "<one-line English summary that captures the CORE action/joke of the story — WHO does WHAT to WHOM and WHY it's funny/dramatic. Must reflect the actual cause-effect chain from the analysis, including any vocal mimicry or sound imitation that triggers the scene.>",
+  "summaryKo": "<same summary translated to natural Korean>",
   "climaxIndex": <0-based index of the most dramatic/important panel>,
   "hasAudioDialogue": ${deepAnalysis.hasAudioDialogue},
   "characterDescriptions": "<combined visual description of ALL characters for consistent image generation>",
@@ -680,9 +659,11 @@ Return JSON with this exact structure:
 }
 
 CRITICAL RULES:
+- "summary" MUST accurately reflect the CORE story from the analysis — especially WHO initiates the action and HOW. If someone imitates a sound (vocal mimicry) to prank someone, the summary must mention this.
 - "description" MUST reference characters by their VISUAL appearance (not names)
 - "description" should be 100-200 characters, rich in visual detail
 - Panels must follow chronological order and capture the ACTUAL story (use the analysis above)
+- If the analysis identifies a vocal mimicry/sound imitation as the inciting incident, it MUST be shown as a dedicated panel (e.g., "A woman with dark hair cups her hands around her mouth, making a ringing sound")
 - "dialogue" should contain the most important line spoken in that moment
 - Select panels that together tell the complete story arc (setup → conflict → climax → resolution)
 - "characterDescriptions" must be detailed enough for consistent image generation`,
@@ -696,7 +677,7 @@ CRITICAL RULES:
     try {
       const response = await bedrockClient.send(
         new ConverseCommand({
-          modelId: MODEL_ID,
+          modelId: PRO_MODEL_ID,
           messages: [userMessage],
           system: [systemPrompt],
           inferenceConfig: { maxTokens: 8192, temperature: 0.2, topP: 0.9 },
@@ -736,7 +717,7 @@ CRITICAL RULES:
 // 통합 분석 함수 (외부에서 호출)
 // ─────────────────────────────────────────────
 
-export type AnalysisStage = 'transcribing' | 'pass1_stepA' | 'pass1_stepB_identify' | 'pass1_stepB_track' | 'pass1_stepB_merge' | 'pass1_stepC' | 'verifying' | 'pass2';
+export type AnalysisStage = 'transcribing' | 'pass1_stepA' | 'pass1_stepB' | 'pass1_stepC' | 'verifying' | 'pass2';
 
 /**
  * 개선된 영상 분석 파이프라인
@@ -772,8 +753,8 @@ export async function analyzeVideo(
   onProgress?.('pass1_stepA');
   const stepAResult = await stepA_DialogueVerification(s3Uri, bucketOwner, transcriptText, frameImages);
 
-  console.log('[Nova] Pass 1 Step B: 인물별 행동 추적 중...');
-  onProgress?.('pass1_stepB_identify');
+  console.log('[Nova] Pass 1 Step B: 상호작용 분석 중...');
+  onProgress?.('pass1_stepB');
   const stepBResult = await stepB_ActionSequenceAnalysis(s3Uri, bucketOwner, frameImages);
 
   console.log('[Nova] Pass 1 Step C: 종합 중...');
@@ -836,6 +817,7 @@ Return JSON:
 {
   "duration": <seconds>,
   "summary": "<one-line English summary>",
+  "summaryKo": "<same summary translated to natural Korean>",
   "climaxIndex": <0-based index>,
   "hasAudioDialogue": <true/false>,
   "characterDescriptions": "<visual description of all characters>",
@@ -855,7 +837,7 @@ Return JSON:
 
   const response = await bedrockClient.send(
     new ConverseCommand({
-      modelId: MODEL_ID,
+      modelId: PRO_MODEL_ID,
       messages: [userMessage],
       system: [systemPrompt],
       inferenceConfig: { maxTokens: 8192, temperature: 0.45, topP: 0.9 },

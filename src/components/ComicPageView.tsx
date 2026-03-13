@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { StoryJson, Panel, DialogueLanguage } from '@/lib/types';
+import { useNarration } from '@/hooks/useNarration';
+import SpeakerButton from '@/components/SpeakerButton';
 
 interface Props {
   storyJson: StoryJson;
@@ -30,9 +32,16 @@ const EMOTION_EMOJI: Record<string, string> = {
 function DialogueBubble({
   panel,
   language,
+  narration,
 }: {
   panel: Panel;
   language: DialogueLanguage;
+  narration?: {
+    activeCutId: number | null;
+    isLoading: boolean;
+    isPlaying: boolean;
+    onPlay: (cutId: number, text: string, voiceId?: string) => void;
+  };
 }) {
   const text = language === 'ko'
     ? (panel.dialogueKo || panel.translation || panel.dialogue)
@@ -41,6 +50,8 @@ function DialogueBubble({
   if (!text) return null;
 
   const emotionStyle = EMOTION_STYLES[panel.emotion] || EMOTION_STYLES.neutral;
+  const isActive = narration?.activeCutId === panel.panelId;
+  const voiceId = language === 'ko' ? 'seoyeon' : 'matthew';
 
   return (
     <div className={`
@@ -50,9 +61,20 @@ function DialogueBubble({
       shadow-lg backdrop-blur-sm
       ${emotionStyle}
       bg-opacity-90
+      flex items-center gap-2
     `}>
-      <span className="mr-1">{EMOTION_EMOJI[panel.emotion] || ''}</span>
-      {text}
+      <span className="flex-1">
+        <span className="mr-1">{EMOTION_EMOJI[panel.emotion] || ''}</span>
+        {text}
+      </span>
+      {narration && (
+        <SpeakerButton
+          size="sm"
+          isLoading={isActive && narration.isLoading}
+          isPlaying={isActive && narration.isPlaying}
+          onClick={() => narration.onPlay(panel.panelId, text, voiceId)}
+        />
+      )}
     </div>
   );
 }
@@ -62,11 +84,18 @@ function PanelCard({
   isClimax,
   language,
   showDialogue,
+  narration,
 }: {
   panel: Panel;
   isClimax: boolean;
   language: DialogueLanguage;
   showDialogue: boolean;
+  narration?: {
+    activeCutId: number | null;
+    isLoading: boolean;
+    isPlaying: boolean;
+    onPlay: (cutId: number, text: string, voiceId?: string) => void;
+  };
 }) {
   const hasImage = !!panel.imageUrl;
 
@@ -102,7 +131,7 @@ function PanelCard({
 
       {/* 대사 오버레이 (CSS로 렌더링 - AI 이미지 텍스트 문제 해결) */}
       {showDialogue && (
-        <DialogueBubble panel={panel} language={language} />
+        <DialogueBubble panel={panel} language={language} narration={narration} />
       )}
 
       {/* 패널 번호 */}
@@ -121,8 +150,10 @@ export default function ComicPageView({ storyJson }: Props) {
   const [viewMode, setViewMode] = useState<'panel' | 'page'>(
     storyJson.isPanelMode ? 'panel' : 'page'
   );
+  const { activeCutId, isLoading, isPlaying, play } = useNarration();
 
   const hasDialogue = storyJson.panels.some(p => p.dialogue || p.dialogueKo);
+  const narrationProps = hasDialogue ? { activeCutId, isLoading, isPlaying, onPlay: play } : undefined;
   const hasPanelImages = storyJson.panels.some(p => p.imageUrl);
   const hasPageImage = !!storyJson.comicPageUrl;
 
@@ -200,7 +231,7 @@ export default function ComicPageView({ storyJson }: Props) {
       {/* 스토리 요약 */}
       <div className="text-center">
         <p className="text-gray-400 text-sm italic">
-          &ldquo;{storyJson.summary}&rdquo;
+          &ldquo;{language === 'ko' && storyJson.summaryKo ? storyJson.summaryKo : storyJson.summary}&rdquo;
         </p>
       </div>
 
@@ -221,6 +252,7 @@ export default function ComicPageView({ storyJson }: Props) {
               isClimax={panel.panelId - 1 === storyJson.climaxIndex}
               language={language}
               showDialogue={showDialogue}
+              narration={narrationProps}
             />
           ))}
         </div>

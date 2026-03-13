@@ -5,6 +5,8 @@ import VideoUploader from '@/components/VideoUploader';
 import ProcessingStatus from '@/components/ProcessingStatus';
 import StyleSwitcher from '@/components/StyleSwitcher';
 import ComicPageView from '@/components/ComicPageView';
+import Link from 'next/link';
+import { MainBounceAnimation } from '@/components/NapzzakAnimation';
 import { StoryJson, ArtStyle } from '@/lib/types';
 
 type AppState = 'upload' | 'processing' | 'result';
@@ -60,29 +62,13 @@ export default function Home() {
   return (
     <main className="min-h-screen">
       <div className="max-w-5xl mx-auto px-4 py-12">
-        <header className="text-center mb-16">
-          <h1 className="text-5xl font-black tracking-tight mb-3">
-            냅<span className="text-blue-500">짝</span>
-          </h1>
-          <p className="text-gray-400 text-lg">
-            영상을 올리면, AI가 만화로 만들어 드려요
-          </p>
-          <div className="mt-3 inline-flex flex-wrap items-center justify-center gap-2 text-xs text-gray-500">
-            <span className="inline-flex items-center gap-1.5 bg-gray-900 px-3 py-1.5 rounded-full">
-              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-              Nova 2 Lite
-              <span className="text-gray-600">영상분석</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5 bg-gray-900 px-3 py-1.5 rounded-full">
-              <span className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse" />
-              Nova Canvas
-              <span className="text-gray-600">만화생성</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5 bg-gray-900 px-3 py-1.5 rounded-full">
-              <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse" />
-              Nova 2 Sonic
-              <span className="text-gray-600">음성</span>
-            </span>
+        {/* 헤더: 마스코트 폴짝 + 납짝 타이틀 */}
+        <header className="mb-12">
+          <div className="flex flex-col items-center gap-4">
+            <MainBounceAnimation />
+            <p className="text-gray-400 text-lg">
+              영상을 올리면, AI가 만화로 납짝 만들어 드려요
+            </p>
           </div>
         </header>
 
@@ -156,6 +142,15 @@ export default function Home() {
             </div>
           </>
         )}
+        {/* 제작자 페이지 링크 */}
+        <div className="text-center mt-12 pb-4">
+          <Link
+            href="/creators"
+            className="text-sm text-gray-500 hover:text-purple-400 transition-colors"
+          >
+            제작자 &rarr;
+          </Link>
+        </div>
       </div>
     </main>
   );
