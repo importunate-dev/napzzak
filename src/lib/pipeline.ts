@@ -4,7 +4,7 @@ import { generatePanelImage, generateSingleComicPage } from '@/lib/canvas';
 import { updateJob, isJobCancelled } from '@/lib/store';
 import { StoryJson, Panel, ArtStyle } from '@/lib/types';
 import { transcribeFromVideo, type TranscribeResult } from '@/lib/transcribe';
-import { extractFrames, saveVideoToTemp, cleanupTemp } from '@/lib/ffmpeg';
+import { extractFrames, saveVideoToTemp, cleanupTemp, getBufferDuration } from '@/lib/ffmpeg';
 import { promises as fs } from 'fs';
 
 class JobCancelledError extends Error {
@@ -20,12 +20,18 @@ async function assertNotCancelled(jobId: string) {
   }
 }
 
+const MODELS_USED = [
+  'Nova Pro (영상 분석)',
+  'AWS Transcribe (대사 추출)',
+  'Nova Canvas (패널별 이미지 생성)',
+];
+
 async function generatePanelImages(
   jobId: string,
   panels: Panel[],
   artStyle: ArtStyle,
   characterDescriptions: string,
-  summary: string
+  summary: string,
 ): Promise<Panel[]> {
   const updatedPanels: Panel[] = [];
 
@@ -44,7 +50,11 @@ async function generatePanelImages(
         panel,
         artStyle,
         characterDescriptions,
-        summary
+        summary,
+        {
+          prev: i > 0 ? panels[i - 1] : undefined,
+          next: i < panels.length - 1 ? panels[i + 1] : undefined,
+        }
       );
 
       const panelImageKey = `videos/${jobId}/panel-${panel.panelId}.png`;
@@ -64,7 +74,7 @@ async function generatePanelImages(
 /**
  * 영상 버퍼에서 키프레임을 추출하고 base64로 변환합니다.
  */
-async function extractKeyframes(videoBuffer: Buffer, duration: number): Promise<string[]> {
+export async function extractKeyframes(videoBuffer: Buffer, duration: number): Promise<string[]> {
   let videoPath = '';
   try {
     videoPath = await saveVideoToTemp(videoBuffer);
@@ -98,7 +108,7 @@ async function extractKeyframes(videoBuffer: Buffer, duration: number): Promise<
 export async function processVideo(
   jobId: string,
   buffer: Buffer,
-  artStyle: ArtStyle = 'GRAPHIC_NOVEL_ILLUSTRATION'
+  artStyle: ArtStyle = 'GRAPHIC_NOVEL_ILLUSTRATION',
 ) {
   const videoKey = `videos/${jobId}/original.mp4`;
   const s3Uri = await uploadToS3(videoKey, buffer, 'video/mp4');
@@ -135,39 +145,46 @@ export async function processVideo(
       console.warn(`[Job ${jobId}] Transcribe 실패 (계속 진행):`, err);
     }
 
-    // Step 0b: 키프레임 추출
+    // Step 0b: ffprobe로 정확한 duration 추출 + 키프레임 추출
     await assertNotCancelled(jobId);
     await updateJob(jobId, {
       progress: 'extracting_frames',
-      progressDetail: '키프레임 추출 중...',
+      progressDetail: '영상 길이 측정 + 키프레임 추출 중...',
     });
+
+    let videoDuration: number | undefined;
+    try {
+      videoDuration = await getBufferDuration(buffer);
+      console.log(`[Job ${jobId}] 영상 길이: ${videoDuration}s`);
+    } catch (err) {
+      console.warn(`[Job ${jobId}] duration 추출 실패 (30s 기본값 사용):`, err);
+    }
 
     let frameImages: string[] | undefined;
     try {
       console.log(`[Job ${jobId}] 키프레임 추출 시작...`);
-      // 일단 대략 30초 기준으로 추출 (정확한 duration은 분석 후 알 수 있음)
-      frameImages = await extractKeyframes(buffer, 30);
+      frameImages = await extractKeyframes(buffer, videoDuration ?? 30);
       console.log(`[Job ${jobId}] 키프레임 ${frameImages.length}장 추출 완료`);
     } catch (err) {
       console.warn(`[Job ${jobId}] 키프레임 추출 실패 (계속 진행):`, err);
     }
 
-    // Pass 1 + Verification + Pass 2
+    // 분석 단계: Nova Pro
     await assertNotCancelled(jobId);
     await updateJob(jobId, {
       progress: 'analyzing_pass1_stepA',
-      progressDetail: 'Nova 분석 파이프라인 시작 (Lite→Pro 듀얼 모델)',
+      progressDetail: 'Nova Pro 분석 파이프라인 시작',
     });
-
-    console.log(`[Job ${jobId}] 개선된 분석 파이프라인 시작...`);
+    console.log(`[Job ${jobId}] Nova Pro 분석 파이프라인 시작...`);
 
     const analysis = await analyzeVideo(s3Uri, bucketOwner, async (stage) => {
       const stageMap: Record<string, { progress: string; detail: string }> = {
-        pass1_stepA: { progress: 'analyzing_pass1_stepA', detail: 'Nova 2 Lite 대사/오디오 분석 중 (Step A: 화자 식별)' },
-        pass1_stepB: { progress: 'analyzing_pass1_stepB', detail: 'Nova 2 Lite 상호작용 분석 중 (Step B: 인과관계)' },
-        pass1_stepC: { progress: 'analyzing_pass1_stepC', detail: 'Nova 2 Pro 스토리 종합 중 (Step C: 스토리 아크)' },
-        verifying: { progress: 'verifying', detail: 'Nova 2 Pro 반박 질문으로 분석 결과 검증 중' },
-        pass2: { progress: 'analyzing_pass2', detail: 'Nova 2 Pro 만화 패널 구조 추출 중 (Pass 2)' },
+        pass1_stepA: { progress: 'analyzing_pass1_stepA', detail: 'Nova Pro 대사/오디오 분석 중 (Step A: 화자 식별)' },
+        pass1_stepB: { progress: 'analyzing_pass1_stepB', detail: 'Nova Pro 상호작용 분석 중 (Step B: 인과관계)' },
+        pass1_debate: { progress: 'analyzing_pass1_debate', detail: 'Nova Pro 분석 모순 해결 중 (Step D: 충돌 분석)' },
+        pass1_stepC: { progress: 'analyzing_pass1_stepC', detail: 'Nova Pro 스토리 종합 중 (Step C: 스토리 아크)' },
+        verifying: { progress: 'verifying', detail: 'Nova Pro 반박 질문으로 분석 결과 검증 중' },
+        pass2: { progress: 'analyzing_pass2', detail: 'Nova Pro 만화 패널 구조 추출 중 (Pass 2)' },
       };
       const info = stageMap[stage];
       if (info) {
@@ -179,7 +196,9 @@ export async function processVideo(
     }, {
       transcriptText,
       frameImages,
+      duration: videoDuration,
     });
+
     console.log(`[Job ${jobId}] 분석 완료: ${analysis.panels.length}개 패널`);
 
     await assertNotCancelled(jobId);
@@ -202,7 +221,7 @@ export async function processVideo(
       panels,
       artStyle,
       analysis.characterDescriptions || '',
-      analysis.summary
+      analysis.summary,
     );
 
     await assertNotCancelled(jobId);
@@ -229,18 +248,15 @@ export async function processVideo(
 
     const storyJson: StoryJson = {
       videoId: jobId,
-      duration: analysis.duration,
+      duration: videoDuration ?? analysis.duration,
       summary: analysis.summary,
       summaryKo: analysis.summaryKo,
       climaxIndex: Math.min(analysis.climaxIndex, panelsWithImages.length - 1),
       panels: panelsWithImages,
       comicPageUrl,
-      novaModelsUsed: [
-        'Nova 2 Lite (Step A/B 추출 분석)',
-        'Nova 2 Pro (Step C 스토리 종합 + Pass 2 패널 기획 + 반박 검증)',
-        'AWS Transcribe (대사 추출)',
-        'Nova Canvas (패널별 이미지 생성)',
-      ],
+      modelsUsed: MODELS_USED,
+      novaModelsUsed: MODELS_USED,
+      modelProvider: 'NOVA',
       hasAudioDialogue: analysis.hasAudioDialogue ?? false,
       artStyle,
       dialogueLanguage: 'en',

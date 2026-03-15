@@ -8,6 +8,28 @@ if (ffmpegStatic) {
   ffmpeg.setFfmpegPath(ffmpegStatic);
 }
 
+export function getVideoDuration(videoPath: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(videoPath, (err, metadata) => {
+      if (err) return reject(err);
+      const duration = metadata?.format?.duration;
+      if (typeof duration !== 'number' || duration <= 0) {
+        return reject(new Error('ffprobe: duration not found'));
+      }
+      resolve(Math.round(duration * 10) / 10); // 0.1s precision
+    });
+  });
+}
+
+export async function getBufferDuration(buffer: Buffer): Promise<number> {
+  const videoPath = await saveVideoToTemp(buffer);
+  try {
+    return await getVideoDuration(videoPath);
+  } finally {
+    await cleanupTemp(videoPath);
+  }
+}
+
 export async function extractFrames(videoPath: string, timestamps: number[]): Promise<string[]> {
   const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), 'napzzak-frames-'));
   const framePaths: string[] = [];

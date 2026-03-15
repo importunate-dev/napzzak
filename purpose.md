@@ -13,7 +13,7 @@
 2. 출품 필수 요건 (가장 중요 ⭐)
 우리 서비스의 핵심 엔진으로 반드시 다음 중 하나 이상을 활용해야 합니다.
 
-Amazon Nova 파운데이션 모델 (Nova 2 Lite, Nova 2 Sonic, 멀티모달 임베딩 등)
+Amazon Nova 파운데이션 모델 (Nova Pro, Nova Canvas, Nova 2 Sonic, 멀티모달 임베딩 등)
 
 Nova Act (에이전트 서비스)
 (※ 보조적으로 타사 프레임워크나 툴을 섞어 쓰는 것은 허용되지만, 메인 AI는 반드시 Amazon Nova여야 합니다.)

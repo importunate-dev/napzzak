@@ -30,7 +30,13 @@ function createSessionEvents(
 ): SonicEvent[] {
   const promptName = uuidv4();
   const systemContentName = uuidv4();
+  const audioContentName = uuidv4();
   const userContentName = uuidv4();
+
+  // Nova Sonic은 speech-to-speech 모델이므로 최소 하나의 오디오 콘텐츠가 필요합니다.
+  // TTS 모드에서는 짧은 무음 오디오를 제공합니다.
+  // 10ms silence at 24kHz 16-bit mono = 480 bytes
+  const silenceBuffer = Buffer.alloc(480).toString('base64');
 
   return [
     {
@@ -88,6 +94,41 @@ function createSessionEvents(
         contentEnd: { promptName, contentName: systemContentName },
       },
     },
+    // 오디오 콘텐츠 블록 (Nova Sonic 필수 요구사항)
+    {
+      event: {
+        contentStart: {
+          promptName,
+          contentName: audioContentName,
+          type: 'AUDIO',
+          interactive: false,
+          role: 'USER',
+          audioInputConfiguration: {
+            mediaType: 'audio/lpcm',
+            sampleRateHertz: 24000,
+            sampleSizeBits: 16,
+            channelCount: 1,
+            audioType: 'SPEECH',
+            encoding: 'base64',
+          },
+        },
+      },
+    },
+    {
+      event: {
+        audioInput: {
+          promptName,
+          contentName: audioContentName,
+          content: silenceBuffer,
+        },
+      },
+    },
+    {
+      event: {
+        contentEnd: { promptName, contentName: audioContentName },
+      },
+    },
+    // 텍스트 입력 (읽어줄 내용)
     {
       event: {
         contentStart: {

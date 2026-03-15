@@ -19,12 +19,12 @@ function getErrorMessage(body: unknown): string {
   return '';
 }
 
-/** 아트 스타일별 프롬프트 프리픽스 */
+/** 아트 스타일별 프롬프트 프리픽스 (간결화: ~40자 이내) */
 const ART_STYLE_PREFIX: Record<ArtStyle, string> = {
-  GRAPHIC_NOVEL_ILLUSTRATION: 'Professional graphic novel illustration style, bold ink outlines, dramatic shading, rich colors.',
-  SOFT_DIGITAL_PAINTING: 'Soft digital painting style, warm colors, gentle brushstrokes, dreamy atmosphere.',
-  FLAT_VECTOR_ILLUSTRATION: 'Clean flat vector illustration style, bold shapes, minimal shading, vibrant solid colors.',
-  '3D_ANIMATED_FAMILY_FILM': '3D animated family film style, Pixar-quality rendering, expressive characters, cinematic lighting.',
+  GRAPHIC_NOVEL_ILLUSTRATION: 'Graphic novel style, bold ink outlines, dramatic shading.',
+  SOFT_DIGITAL_PAINTING: 'Soft digital painting, warm colors, dreamy atmosphere.',
+  FLAT_VECTOR_ILLUSTRATION: 'Flat vector illustration, bold shapes, vibrant colors.',
+  '3D_ANIMATED_FAMILY_FILM': '3D animated style, Pixar-quality, cinematic lighting.',
 };
 
 /**
@@ -35,29 +35,30 @@ function buildPanelPrompt(
   panel: Panel,
   artStyle: ArtStyle,
   characterDescriptions: string,
-  storyContext: string
+  storyContext: string,
+  adjacentPanels?: { prev?: Panel; next?: Panel }
 ): string {
   const stylePrefix = ART_STYLE_PREFIX[artStyle];
-  const parts: string[] = [
-    stylePrefix,
-    'Single comic panel illustration. No text, no speech bubbles, no letters, no words, no captions, no writing of any kind.',
-  ];
 
-  // 캐릭터 일관성 정보 (분석 단계에서 추출)
+  const parts: string[] = [stylePrefix];
+
+  // 인접 패널 컨텍스트 추가 (최대 ~180자)
+  if (adjacentPanels?.prev) {
+    parts.push(`Previous scene: ${adjacentPanels.prev.description.slice(0, 80)}.`);
+  }
+  if (adjacentPanels?.next) {
+    parts.push(`Next scene: ${adjacentPanels.next.description.slice(0, 80)}.`);
+  }
+
+  parts.push(panel.description.slice(0, 500));
+
   if (characterDescriptions) {
-    parts.push(`Characters: ${characterDescriptions.slice(0, 200)}`);
+    const hasAdjacent = adjacentPanels?.prev || adjacentPanels?.next;
+    parts.push(characterDescriptions.slice(0, hasAdjacent ? 200 : 350));
   }
 
-  // 스토리 컨텍스트 (이 패널이 전체 이야기의 어느 위치인지)
-  if (storyContext) {
-    parts.push(`Story context: ${storyContext.slice(0, 100)}`);
-  }
-
-  // 패널 description (더 길게 허용 - 200자)
-  parts.push(`Scene: ${panel.description.slice(0, 200)}`);
-
-  // 감정 힌트
-  parts.push(`Mood/emotion: ${panel.emotion}`);
+  parts.push(`Mood: ${panel.emotion}`);
+  parts.push('No text, no speech bubbles, no writing.');
 
   const prompt = parts.join(' ').slice(0, 1024);
   return prompt;
@@ -112,14 +113,29 @@ const NEGATIVE_TEXT = [
  * 패널 하나에 대한 개별 이미지를 생성합니다.
  * 이 방식이 단일 페이지 통합 생성보다 품질이 훨씬 좋습니다.
  */
+/**
+ * 문자열에서 결정론적 해시 시드를 생성합니다.
+ * 동일 입력이면 항상 같은 시드를 반환하여 패널 간 스타일 일관성을 유지합니다.
+ */
+function hashSeed(input: string): number {
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    hash = ((hash << 5) - hash + input.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash) % 100000;
+}
+
 export async function generatePanelImage(
   panel: Panel,
   artStyle: ArtStyle,
   characterDescriptions: string = '',
-  storyContext: string = ''
+  storyContext: string = '',
+  adjacentPanels?: { prev?: Panel; next?: Panel }
 ): Promise<Buffer> {
-  const prompt = buildPanelPrompt(panel, artStyle, characterDescriptions, storyContext);
+  const prompt = buildPanelPrompt(panel, artStyle, characterDescriptions, storyContext, adjacentPanels);
 
+  // characterDescriptions 기반 고정 시드로 패널 간 캐릭터/스타일 일관성 유지
+  const baseSeed = hashSeed(characterDescriptions + artStyle);
   const requestBody = {
     taskType: 'TEXT_IMAGE',
     textToImageParams: {
@@ -130,8 +146,8 @@ export async function generatePanelImage(
       width: 1024,
       height: 1024,
       quality: 'premium',
-      cfgScale: 8.0,
-      seed: 42 + panel.panelId, // 패널마다 다른 시드로 다양성 확보
+      cfgScale: 10.0,
+      seed: baseSeed + panel.panelId,
       numberOfImages: 1,
     },
   };

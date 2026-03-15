@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 async function processYouTube(
   jobId: string,
   url: string,
-  artStyle?: ArtStyle
+  artStyle?: ArtStyle,
 ) {
   console.log(`[Job ${jobId}] YouTube 다운로드 시작: ${url}`);
   const { buffer, title } = await downloadYouTube(url);

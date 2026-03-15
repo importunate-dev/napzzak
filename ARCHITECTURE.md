@@ -4,12 +4,11 @@
 
 ---
 
-## 1. 사용 AI 모델 / 서비스 (5개)
+## 1. 사용 AI 모델 / 서비스 (4개)
 
 | 모델/서비스 | 모델 ID / 서비스 | 역할 | API 방식 |
 |-------------|-----------------|------|----------|
-| **Nova 2 Lite** | `us.amazon.nova-2-lite-v1:0` | Pass 1 Step A (대사/오디오 검증) · Step B (행동/인과관계 분석) | Converse API (`ConverseCommand`) |
-| **Nova 2 Pro** | `us.amazon.nova-pro-v1:0` | Pass 1 Step C (스토리 종합) · 반박 검증 · Pass 2 (패널 구조 추출) | Converse API (`ConverseCommand`) |
+| **Nova Pro** | `us.amazon.nova-pro-v1:0` | Pass 1 Step A/B/C (영상 심층 분석) · 반박 검증 · Pass 2 (패널 구조 추출) | Converse API (`ConverseCommand`) |
 | **Nova Canvas** | `amazon.nova-canvas-v1:0` | 패널별 개별 만화 이미지 생성 + 통합 페이지 생성 | InvokeModel API |
 | **Nova 2 Sonic** | `amazon.nova-2-sonic-v1:0` | 만화 패널 대사 음성 내레이션 (on-demand) | Bidirectional Stream API |
 | **AWS Transcribe** | Amazon Transcribe | 영상에서 대사 텍스트 추출 (화자 분리 포함) | TranscribeStreamingClient |
@@ -45,15 +44,15 @@
     ┌─────────────────────────────────────────┐
     │  STAGE 3: Pass 1 - 3단계 CoT 심층 분석   │
     │                                         │
-    │  Step A: 대사/오디오 검증 (Nova 2 Lite)  │
+    │  Step A: 대사/오디오 검증 (Nova Pro)  │
     │    입력: S3 영상 + Transcribe 결과 + 키프레임 │
     │    출력: 화자 식별 + 대사-화자 매핑 (평문)  │
     │                                         │
-    │  Step B: 행동 순서/인과관계 분석 (Nova 2 Lite) │
+    │  Step B: 행동 순서/인과관계 분석 (Nova Pro) │
     │    입력: S3 영상 + 키프레임               │
     │    출력: 인물 간 상호작용 + 인과관계 (평문) │
     │                                         │
-    │  Step C: 스토리 종합 (Nova 2 Pro)        │
+    │  Step C: 스토리 종합 (Nova Pro)        │
     │    입력: S3 영상 + Step A + Step B 결과  │
     │    출력: VideoDeepAnalysis JSON          │
     │      - characters (외모/역할)             │
@@ -64,7 +63,7 @@
     └─────────────┬───────────────────────────┘
                   ↓
     ┌─────────────────────────────────────────┐
-    │  STAGE 4: 반박 검증 (Nova 2 Pro)         │
+    │  STAGE 4: 반박 검증 (Nova Pro)         │
     │    입력: S3 영상 + Step C 분석 결과       │
     │    6가지 반박 질문으로 오류 검증/수정:      │
     │      - 화자 귀속 검증                     │
@@ -77,7 +76,7 @@
                   ↓
     ┌─────────────────────────────────────────┐
     │  STAGE 5: Pass 2 - 만화 패널 구조 추출   │
-    │  (Nova 2 Pro)                           │
+    │  (Nova Pro)                           │
     │    입력: S3 영상 + 검증된 DeepAnalysis    │
     │    출력: NovaAnalysisResult JSON         │
     │      - characterDescriptions            │
@@ -148,7 +147,7 @@ napzzak/
 │   │       ├── upload-youtube/route.ts # YouTube URL 기반 영상 업로드
 │   │       └── analyze-story/route.ts  # 스토리 분석 API
 │   ├── lib/
-│   │   ├── bedrock.ts                  # Nova 2 Lite/Pro - 멀티패스 영상 분석
+│   │   ├── bedrock.ts                  # Nova Pro - 멀티패스 영상 분석
 │   │   ├── canvas.ts                   # Nova Canvas - 패널별 개별 + 통합 페이지 생성
 │   │   ├── transcribe.ts              # AWS Transcribe - 대사 추출 + 화자 분리
 │   │   ├── ffmpeg.ts                  # ffmpeg - 키프레임 추출 + 영상 처리
@@ -243,10 +242,10 @@ videos/{jobId}/
 
 ## 6. 사용자 전환 시 재처리 범위
 
-| 사용자 액션 | AWS Transcribe | Nova 2 Lite (Pass 1 A/B) | Nova 2 Pro (Pass 1 C + Verify + Pass 2) | Nova Canvas (패널별) |
-|-------------|:--------------:|:------------------------:|:---------------------------------------:|:-------------------:|
-| 최초 생성    | O              | O (Step A + Step B)      | O (Step C + Verify + Pass 2)            | O (N패널 + 통합 1장) |
-| 그림체 변경  | X              | X                        | X                                       | O (패널별 재생성)     |
+| 사용자 액션 | AWS Transcribe | Nova Pro (Pass 1 + Verify + Pass 2) | Nova Canvas (패널별) |
+|-------------|:--------------:|:-----------------------------------:|:-------------------:|
+| 최초 생성    | O              | O (Step A/B/C + Verify + Pass 2)    | O (N패널 + 통합 1장) |
+| 그림체 변경  | X              | X                                   | O (패널별 재생성)     |
 
 ---
 
@@ -257,11 +256,11 @@ videos/{jobId}/
 | 1 | `uploaded` | S3에 영상 업로드 완료 |
 | 2 | `transcribing` | AWS Transcribe: 대사 추출 + 화자 분리 |
 | 3 | `extracting_frames` | ffmpeg: 0.5초 간격 키프레임 추출 |
-| 4 | `analyzing_pass1_stepA` | Nova 2 Lite: 대사/오디오 검증 (화자 식별) |
-| 5 | `analyzing_pass1_stepB` | Nova 2 Lite: 행동 순서 + 인과관계 분석 |
-| 6 | `analyzing_pass1_stepC` | Nova 2 Pro: 스토리 종합 (기승전결 아크) |
-| 7 | `verifying` | Nova 2 Pro: 반박 질문 기반 분석 결과 검증 |
-| 8 | `analyzing_pass2` | Nova 2 Pro: 만화 패널 구조 추출 |
+| 4 | `analyzing_pass1_stepA` | Nova Pro: 대사/오디오 검증 (화자 식별) |
+| 5 | `analyzing_pass1_stepB` | Nova Pro: 행동 순서 + 인과관계 분석 |
+| 6 | `analyzing_pass1_stepC` | Nova Pro: 스토리 종합 (기승전결 아크) |
+| 7 | `verifying` | Nova Pro: 반박 질문 기반 분석 결과 검증 |
+| 8 | `analyzing_pass2` | Nova Pro: 만화 패널 구조 추출 |
 | 9 | `generating_panels` | Nova Canvas: 패널별 개별 이미지 생성 (1/N ~ N/N) |
 | 10 | `generating_comic` | Nova Canvas: 통합 만화 페이지 생성 (폴백용) |
 | - | `completed` | 만화 생성 완료 |
@@ -270,7 +269,7 @@ videos/{jobId}/
 
 ## 8. 3단계 Chain-of-Thought 분석 상세
 
-### Step A: 대사/오디오 검증 (Nova 2 Lite)
+### Step A: 대사/오디오 검증 (Nova Pro)
 
 입력: S3 영상 + AWS Transcribe 결과 + 키프레임
 
@@ -279,7 +278,7 @@ videos/{jobId}/
 - **화자-대사 매핑**: 립무브먼트 기반 정확한 화자 귀속
 - **보컬 미미크리 감지**: 사람이 소리를 흉내내는 행동 감지
 
-### Step B: 행동 순서/인과관계 분석 (Nova 2 Lite)
+### Step B: 행동 순서/인과관계 분석 (Nova Pro)
 
 입력: S3 영상 + 키프레임
 
@@ -288,7 +287,7 @@ videos/{jobId}/
 - **가짜/진짜 구분**: 연기나 모방 행동 vs 실제 행동
 - **감정 변화 아크**: 각 인물의 감정 변화 추적
 
-### Step C: 종합 (Nova 2 Pro)
+### Step C: 종합 (Nova Pro)
 
 입력: S3 영상 + Step A + Step B 결과 + Transcribe 텍스트
 
@@ -297,7 +296,7 @@ videos/{jobId}/
 - **품질 검증 게이트**: summary 길이, 대사 수, 캐릭터 외모 검증
 - 품질 불합격 시 자동 재시도
 
-### Verification: 반박 검증 (Nova 2 Pro)
+### Verification: 반박 검증 (Nova Pro)
 
 Step C 결과를 6가지 반박 질문으로 검증:
 1. 화자 귀속 재검증 (립무브먼트 재확인)
@@ -307,7 +306,7 @@ Step C 결과를 6가지 반박 질문으로 검증:
 5. 대화-행동 일관성
 6. 보컬 미미크리 감지
 
-### Pass 2: 패널 구조 추출 (Nova 2 Pro)
+### Pass 2: 패널 구조 추출 (Nova Pro)
 
 검증된 DeepAnalysis를 컨텍스트로 주입하여:
 - **characterDescriptions**: 이미지 생성기용 캐릭터 외모 통합 설명
@@ -335,8 +334,7 @@ Step C 결과를 6가지 반박 질문으로 검증:
 | 서비스 | 리소스 | 용도 |
 |--------|--------|------|
 | **Amazon S3** | `napzzak-videos-{accountId}` | 영상, 패널 이미지, Story JSON 저장 |
-| **Amazon Bedrock** | Nova 2 Lite | 영상 Pass 1 Step A/B 추출 분석 |
-| **Amazon Bedrock** | Nova 2 Pro | 영상 Pass 1 Step C + 검증 + Pass 2 패널 기획 |
+| **Amazon Bedrock** | Nova Pro | 영상 Pass 1 (Step A/B/C) + 반박 검증 + Pass 2 패널 기획 |
 | **Amazon Bedrock** | Nova Canvas | 패널별 만화 이미지 생성 |
 | **Amazon Bedrock** | Nova 2 Sonic | 음성 내레이션 |
 | **Amazon Transcribe** | Streaming API | 영상 대사 추출 + 화자 분리 |
@@ -351,7 +349,7 @@ Step C 결과를 6가지 반박 질문으로 검증:
 | **프레임워크** | Next.js 16 (App Router) |
 | **언어** | TypeScript |
 | **스타일링** | Tailwind CSS |
-| **AI (분석)** | Amazon Bedrock Nova 2 Lite + Nova 2 Pro (3단계 CoT) |
+| **AI (분석)** | Amazon Bedrock Nova Pro (3단계 CoT) |
 | **AI (이미지)** | Amazon Bedrock Nova Canvas |
 | **AI (음성)** | Amazon Bedrock Nova 2 Sonic |
 | **음성 인식** | Amazon Transcribe (Streaming) |
@@ -364,7 +362,7 @@ Step C 결과를 6가지 반박 질문으로 검증:
 
 ## 12. 차별화 포인트
 
-1. **Amazon Nova 듀얼 모델** - Nova 2 Lite(빠른 추출) + Nova 2 Pro(고급 추론) 역할 분리
+1. **Amazon Nova Pro** - 3단계 CoT 분석 + 반박 검증 + 패널 구조 추출까지 단일 모델로 처리
 2. **3단계 Chain-of-Thought 분석** - Step A(대사) → Step B(행동) → Step C(종합) 순차 분석
 3. **반박 검증 게이트** - 6가지 adversarial 질문으로 분석 오류 자동 교정
 4. **AWS Transcribe 통합** - 화자 분리된 정확한 대사 텍스트를 AI 분석에 주입
@@ -385,11 +383,11 @@ Step C 결과를 6가지 반박 질문으로 검증:
 |------|------------|---------|------|
 | 대사 추출 | AWS Transcribe | 1회 | 스트리밍 API |
 | 키프레임 추출 | ffmpeg | - | 로컬 처리 |
-| Step A (대사 검증) | Nova 2 Lite | 1회 | 화자 식별 |
-| Step B (행동 분석) | Nova 2 Lite | 1회 | 인과관계 |
-| Step C (종합) | Nova 2 Pro | 1~2회 | 품질 검증 재시도 포함 |
-| 반박 검증 | Nova 2 Pro | 1회 | Adversarial |
-| Pass 2 (패널 기획) | Nova 2 Pro | 1~3회 | 재시도 포함 |
+| Step A (대사 검증) | Nova Pro | 1회 | 화자 식별 |
+| Step B (행동 분석) | Nova Pro | 1회 | 인과관계 |
+| Step C (종합) | Nova Pro | 1~2회 | 품질 검증 재시도 포함 |
+| 반박 검증 | Nova Pro | 1회 | Adversarial |
+| Pass 2 (패널 기획) | Nova Pro | 1~3회 | 재시도 포함 |
 | 패널별 이미지 | Nova Canvas | 4~6회 | 패널 수만큼 |
 | 통합 페이지 | Nova Canvas | 1회 | 레거시/폴백 |
 | 음성 내레이션 | Nova 2 Sonic | on-demand | 사용자 요청 시 |

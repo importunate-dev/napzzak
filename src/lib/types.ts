@@ -4,6 +4,8 @@ export type ArtStyle =
   | 'FLAT_VECTOR_ILLUSTRATION'
   | '3D_ANIMATED_FAMILY_FILM';
 
+export type ModelProvider = 'NOVA';
+
 export type DialogueLanguage = 'ko' | 'en';
 
 export interface Panel {
@@ -32,7 +34,11 @@ export interface StoryJson {
   panels: Panel[];
   /** 단일 만화 페이지 이미지 URL (레거시 모드) */
   comicPageUrl: string;
-  novaModelsUsed: string[];
+  /** 사용된 모델 목록 */
+  modelsUsed: string[];
+  /** @deprecated Use modelsUsed instead */
+  novaModelsUsed?: string[];
+  modelProvider?: ModelProvider;
   hasAudioDialogue: boolean;
   artStyle: ArtStyle;
   dialogueLanguage: DialogueLanguage;
@@ -54,6 +60,7 @@ export type JobProgress =
   | 'extracting_frames'
   | 'analyzing_pass1_stepA'
   | 'analyzing_pass1_stepB'
+  | 'analyzing_pass1_debate'
   | 'analyzing_pass1_stepC'
   | 'verifying'
   | 'analyzing_pass2'

@@ -82,7 +82,7 @@ export default function Home() {
                 />
               </div>
               <p className="text-center text-gray-600 text-xs">
-                만화 그림체를 선택한 뒤 영상을 올려주세요 (대사 없는 시각적 만화로 변환됩니다)
+                그림체를 선택한 뒤 영상을 올려주세요 (대사 없는 시각적 만화로 변환됩니다)
               </p>
             </div>
             <VideoUploader
@@ -125,19 +125,20 @@ export default function Home() {
             <ComicPageView storyJson={storyJson} />
 
             <div className="text-center mt-12 space-y-3">
-              <button
-                onClick={handleReset}
-                className="px-8 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-semibold transition-colors"
-              >
-                다른 영상 변환하기
-              </button>
-              {storyJson.novaModelsUsed && storyJson.novaModelsUsed.length > 0 && (
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  onClick={handleReset}
+                  className="px-8 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-semibold transition-colors"
+                >
+                  다른 영상 변환하기
+                </button>
+              </div>
+              {(storyJson.modelsUsed ?? storyJson.novaModelsUsed)?.length ? (
                 <p className="text-gray-600 text-xs">
-                  {storyJson.novaModelsUsed.join(' · ')} · Nova 2 Sonic (음성 내레이션)
+                  {(storyJson.modelsUsed ?? storyJson.novaModelsUsed)!.join(' · ')}
                 </p>
-              )}
-              {(!storyJson.novaModelsUsed || storyJson.novaModelsUsed.length === 0) && (
-                <p className="text-gray-600 text-xs">Powered by Amazon Nova AI</p>
+              ) : (
+                <p className="text-gray-600 text-xs">Powered by AI</p>
               )}
             </div>
           </>

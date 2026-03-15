@@ -20,7 +20,7 @@
 
 ## 🔹 High-Level Architecture
 
-영상 업로드 → S3 저장 → Nova 2 Lite Step A/B (추출 분석) → Nova 2 Pro Step C (스토리 종합) → Nova 2 Pro 반박 검증 → Nova 2 Pro Pass 2 (패널 구조) → Nova Canvas (패널별 이미지) → Story JSON → 프론트엔드 렌더링 + Nova 2 Sonic (음성 내레이션, on-demand)
+영상 업로드 → S3 저장 → Nova Pro Step A/B (추출 분석) → Nova Pro Step C (스토리 종합) → Nova Pro 반박 검증 → Nova Pro Pass 2 (패널 구조) → Nova Canvas (패널별 이미지) → Story JSON → 프론트엔드 렌더링 + Nova 2 Sonic (음성 내레이션, on-demand)
 
 ---
 
@@ -39,11 +39,11 @@
 1. 영상 → S3 업로드
 2. AWS Transcribe: 대사 추출 + 화자 분리
 3. ffmpeg: 0.5초 간격 키프레임 추출
-4. Nova 2 Lite Step A: 대사/오디오 검증 (화자 식별)
-5. Nova 2 Lite Step B: 행동 순서 + 인과관계 분석
-6. Nova 2 Pro Step C: Step A + Step B 결과를 종합하여 스토리 아크 생성
-7. Nova 2 Pro 반박 검증: 6가지 adversarial 질문으로 분석 오류 교정
-8. Nova 2 Pro Pass 2: 검증된 분석으로 4~6 패널 구조 + characterDescriptions 추출
+4. Nova Pro Step A: 대사/오디오 검증 (화자 식별)
+5. Nova Pro Step B: 행동 순서 + 인과관계 분석
+6. Nova Pro Step C: Step A + Step B 결과를 종합하여 스토리 아크 생성
+7. Nova Pro 반박 검증: 6가지 adversarial 질문으로 분석 오류 교정
+8. Nova Pro Pass 2: 검증된 분석으로 4~6 패널 구조 + characterDescriptions 추출
 9. Nova Canvas × N: 각 패널 개별 이미지 생성 (characterDescriptions 공통 주입)
 10. Nova Canvas × 1: 통합 만화 페이지 생성 (폴백)
 11. Story JSON 생성 → S3 + DynamoDB 저장
@@ -146,10 +146,10 @@
 # 8. 🔥 차별화 포인트
 
 1. **3단계 CoT 심층 분석:** Step A(대사) → Step B(행동) → Step C(종합) 순차 분석 + 반박 검증
-2. **듀얼 모델 전략:** Nova 2 Lite(빠른 추출) + Nova 2 Pro(고급 추론) 역할 분리
+2. **Nova Pro 단일 모델:** 3단계 CoT 분석 + 반박 검증 + 패널 구조 추출까지 처리
 3. **패널별 개별 생성:** 캐릭터 외모 일관성 + 각 패널 고품질 이미지
 4. **CSS 대사 오버레이:** AI 이미지 텍스트 렌더링 한계를 구조적으로 해결
-5. **Nova 5중 활용:** 분석(Lite + Pro) + 생성(Canvas) + 음성(Sonic) + 대사추출(Transcribe)
+5. **Nova 4중 활용:** 분석(Pro) + 생성(Canvas) + 음성(Sonic) + 대사추출(Transcribe)
 6. **음성 내레이션:** Nova 2 Sonic으로 대사 음성 재생 (on-demand)
 7. **마스코트 캐릭터:** 납서(문어) + 짝이(너구리) 납짝 애니메이션
 8. **프론트 중심 레이아웃 엔진:** View Layer에서 데이터 재해석
