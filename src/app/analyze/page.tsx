@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 
-// ─── 타입 정의 ───
+// ─── Type Definitions ───
 
 interface TranscriptSegment {
   startTime: number;
@@ -96,9 +96,9 @@ interface ApiResponse {
   panels: PanelWithImage[];
 }
 
-// ─── 공통 UI 컴포넌트 ───
+// ─── Common UI Components ───
 
-function CopyButton({ text, label = '복사' }: { text: string; label?: string }) {
+function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(async (e: React.MouseEvent) => {
@@ -170,7 +170,7 @@ function StepHeader({ step, label }: { step: string; label: string }) {
   );
 }
 
-// ─── 메인 페이지 ───
+// ─── Main Page ───
 
 export default function AnalyzePage() {
   const [url, setUrl] = useState('');
@@ -186,7 +186,7 @@ export default function AnalyzePage() {
     setLoading(true);
     setError(null);
     setResult(null);
-    setProgress('YouTube 다운로드 + 전처리 중...');
+    setProgress('Downloading YouTube + preprocessing...');
 
     try {
       const res = await fetch('/api/analyze-story', {
@@ -197,13 +197,13 @@ export default function AnalyzePage() {
 
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || '분석 실패');
+        setError(data.error || 'Analysis failed');
         return;
       }
 
       setResult(data as ApiResponse);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '요청 실패');
+      setError(err instanceof Error ? err.message : 'Request failed');
     } finally {
       setLoading(false);
       setProgress('');
@@ -213,9 +213,9 @@ export default function AnalyzePage() {
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
       <div className="max-w-5xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold mb-1">풀 파이프라인 디버그 뷰어</h1>
+        <h1 className="text-2xl font-bold mb-1">Full Pipeline Debug Viewer</h1>
         <p className="text-gray-500 text-sm mb-6">
-          메인 파이프라인과 동일한 전체 과정을 실행하고, 각 단계의 중간 데이터를 모두 확인합니다
+          Runs the same full process as the main pipeline and shows intermediate data from each step
         </p>
 
         <form onSubmit={handleSubmit} className="flex gap-3 mb-8">
@@ -231,7 +231,7 @@ export default function AnalyzePage() {
             disabled={loading || !url.trim()}
             className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 rounded-lg font-medium transition-colors whitespace-nowrap"
           >
-            {loading ? '실행 중...' : '풀 파이프라인 실행'}
+            {loading ? 'Running...' : 'Run Full Pipeline'}
           </button>
         </form>
 
@@ -240,9 +240,9 @@ export default function AnalyzePage() {
             <div className="inline-block w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
             <p className="text-gray-400">{progress}</p>
             <p className="text-gray-500 text-sm mt-1">
-              전체 파이프라인 실행: Transcribe → Step A/B/C → 검증 → Pass 2 → 이미지 생성
+              Full pipeline execution: Transcribe → Step A/B/C → Verification → Pass 2 → Image Generation
             </p>
-            <p className="text-gray-600 text-xs mt-1">약 5~10분 소요됩니다</p>
+            <p className="text-gray-600 text-xs mt-1">Takes approximately 5–10 minutes</p>
           </div>
         )}
 
@@ -256,7 +256,7 @@ export default function AnalyzePage() {
 
         <div className="text-center mt-8">
           <a href="/" className="text-sm text-gray-500 hover:text-purple-400 transition-colors">
-            &larr; 메인으로
+            &larr; Home
           </a>
         </div>
       </div>
@@ -264,25 +264,25 @@ export default function AnalyzePage() {
   );
 }
 
-// ─── 마크다운 생성 ───
+// ─── Markdown Generation ───
 
 function buildFullMarkdown(data: ApiResponse): string {
   const { title, url, transcribe, keyframeCount, steps, panels } = data;
   const lines: string[] = [];
 
-  lines.push(`# 영상 분석 디버그 리포트`);
+  lines.push(`# Video Analysis Debug Report`);
   lines.push('');
-  lines.push(`- **제목**: ${title}`);
+  lines.push(`- **Title**: ${title}`);
   lines.push(`- **URL**: ${url}`);
-  lines.push(`- **장르**: ${steps.stepC.genre}`);
-  lines.push(`- **길이**: ${steps.stepC.duration}초`);
-  lines.push(`- **음성 대사**: ${steps.stepC.hasAudioDialogue ? 'O' : 'X'}`);
-  lines.push(`- **키프레임**: ${keyframeCount}장`);
-  lines.push(`- **품질 검증**: ${steps.qualityCheck.valid ? 'PASS' : 'FAIL'} — ${steps.qualityCheck.reason}`);
+  lines.push(`- **Genre**: ${steps.stepC.genre}`);
+  lines.push(`- **Duration**: ${steps.stepC.duration}s`);
+  lines.push(`- **Audio Dialogue**: ${steps.stepC.hasAudioDialogue ? 'O' : 'X'}`);
+  lines.push(`- **Keyframes**: ${keyframeCount} frames`);
+  lines.push(`- **Quality Check**: ${steps.qualityCheck.valid ? 'PASS' : 'FAIL'} — ${steps.qualityCheck.reason}`);
   lines.push('');
 
   // Transcribe
-  lines.push(`## 1. Transcribe 결과`);
+  lines.push(`## 1. Transcribe Results`);
   lines.push('');
   if (transcribe && transcribe.segments.length > 0) {
     for (const seg of transcribe.segments) {
@@ -292,12 +292,12 @@ function buildFullMarkdown(data: ApiResponse): string {
     lines.push('');
     lines.push(`> Full Text: ${transcribe.fullText}`);
   } else {
-    lines.push('대사 없음');
+    lines.push('No dialogue');
   }
   lines.push('');
 
   // Step A
-  lines.push(`## 2. Step A: 대사/오디오 분석 (Nova Pro)`);
+  lines.push(`## 2. Step A: Dialogue/Audio Analysis (Nova Pro)`);
   lines.push('');
   lines.push('```');
   lines.push(steps.stepA);
@@ -305,7 +305,7 @@ function buildFullMarkdown(data: ApiResponse): string {
   lines.push('');
 
   // Step B
-  lines.push(`## 3. Step B: 상호작용 분석 (Nova Pro)`);
+  lines.push(`## 3. Step B: Interaction Analysis (Nova Pro)`);
   lines.push('');
   lines.push('```');
   lines.push(steps.stepB);
@@ -313,7 +313,7 @@ function buildFullMarkdown(data: ApiResponse): string {
   lines.push('');
 
   // Step C
-  lines.push(`## 4. Step C: 종합 분석 (Nova Pro)`);
+  lines.push(`## 4. Step C: Comprehensive Analysis (Nova Pro)`);
   lines.push('');
   lines.push(`### Story Arc`);
   lines.push(`- **Setup**: ${steps.stepC.storyArc.setup}`);
@@ -343,13 +343,13 @@ function buildFullMarkdown(data: ApiResponse): string {
   lines.push('');
 
   // Quality
-  lines.push(`## 5. 품질 검증`);
-  lines.push(`- **결과**: ${steps.qualityCheck.valid ? 'PASS' : 'FAIL'}`);
-  lines.push(`- **사유**: ${steps.qualityCheck.reason}`);
+  lines.push(`## 5. Quality Check`);
+  lines.push(`- **Result**: ${steps.qualityCheck.valid ? 'PASS' : 'FAIL'}`);
+  lines.push(`- **Reason**: ${steps.qualityCheck.reason}`);
   lines.push('');
 
   // Verified
-  lines.push(`## 6. 반박 검증 결과 (Verified)`);
+  lines.push(`## 6. Challenge Verification Result (Verified)`);
   lines.push('');
   lines.push('```json');
   lines.push(JSON.stringify(steps.verified, null, 2));
@@ -357,12 +357,12 @@ function buildFullMarkdown(data: ApiResponse): string {
   lines.push('');
 
   // Pass 2
-  lines.push(`## 7. Pass 2: 패널 구조`);
+  lines.push(`## 7. Pass 2: Panel Structure`);
   lines.push('');
   lines.push(`- **Summary (EN)**: ${steps.pass2.summary}`);
   if (steps.pass2.summaryKo) lines.push(`- **Summary (KO)**: ${steps.pass2.summaryKo}`);
   lines.push(`- **Character Descriptions**: ${steps.pass2.characterDescriptions}`);
-  lines.push(`- **Climax Index**: 패널 ${steps.pass2.climaxIndex + 1}`);
+  lines.push(`- **Climax Index**: Panel ${steps.pass2.climaxIndex + 1}`);
   lines.push('');
   for (const p of steps.pass2.panels) {
     const climax = steps.pass2.panels.indexOf(p) === steps.pass2.climaxIndex ? ' **(CLIMAX)**' : '';
@@ -374,10 +374,10 @@ function buildFullMarkdown(data: ApiResponse): string {
   }
 
   // Image Prompts
-  lines.push(`## 8. 이미지 생성 프롬프트`);
+  lines.push(`## 8. Image Generation Prompts`);
   lines.push('');
   for (const ip of steps.imagePrompts) {
-    lines.push(`### Panel ${ip.panelId} (${ip.prompt.length}/1024자)`);
+    lines.push(`### Panel ${ip.panelId} (${ip.prompt.length}/1024 chars)`);
     lines.push('```');
     lines.push(ip.prompt);
     lines.push('```');
@@ -386,50 +386,50 @@ function buildFullMarkdown(data: ApiResponse): string {
   }
 
   // Panels with images
-  lines.push(`## 9. 생성된 이미지`);
+  lines.push(`## 9. Generated Images`);
   lines.push('');
   for (const p of panels) {
     lines.push(`### Panel ${p.panelId} — ${p.emotion}`);
-    lines.push(`- **설명**: ${p.description}`);
-    if (p.dialogue) lines.push(`- **대사(EN)**: ${p.dialogue}`);
-    if (p.dialogueKo) lines.push(`- **대사(KO)**: ${p.dialogueKo}`);
-    if (p.imageUrl) lines.push(`- **이미지**: ${p.imageUrl}`);
+    lines.push(`- **Description**: ${p.description}`);
+    if (p.dialogue) lines.push(`- **Dialogue(EN)**: ${p.dialogue}`);
+    if (p.dialogueKo) lines.push(`- **Dialogue(KO)**: ${p.dialogueKo}`);
+    if (p.imageUrl) lines.push(`- **Image**: ${p.imageUrl}`);
     lines.push('');
   }
 
   return lines.join('\n');
 }
 
-// ─── 디버그 뷰어 ───
+// ─── Debug Viewer ───
 
 function DebugView({ data }: { data: ApiResponse }) {
   const { title, url, transcribe, keyframeCount, steps, panels } = data;
 
   const fullMarkdown = buildFullMarkdown(data);
 
-  // Section별 copy text 생성
+  // Generate per-section copy text
   const transcribeCopyText = transcribe
     ? transcribe.segments.map(s => `[${s.startTime.toFixed(1)}s] ${s.speaker ? `[${s.speaker}] ` : ''}${s.text}`).join('\n') + '\n\n' + transcribe.fullText
     : '';
 
   return (
     <div className="space-y-4">
-      {/* 전체 마크다운 복사 버튼 */}
+      {/* Full markdown copy button */}
       <div className="flex gap-2 justify-end">
-        <CopyButton text={fullMarkdown} label="전체 마크다운 복사" />
-        <CopyButton text={JSON.stringify(data, null, 2)} label="Raw JSON 복사" />
+        <CopyButton text={fullMarkdown} label="Copy Full Markdown" />
+        <CopyButton text={JSON.stringify(data, null, 2)} label="Copy Raw JSON" />
       </div>
 
-      {/* 0. 기본 정보 */}
+      {/* 0. Basic Info */}
       <div className="p-4 bg-gray-900 rounded-lg border border-gray-800">
         <h2 className="font-bold text-lg">{title}</h2>
         <p className="text-gray-400 text-sm mt-1">{url}</p>
         <div className="flex gap-3 mt-3 text-sm flex-wrap">
-          <span className="px-2 py-1 bg-gray-800 rounded">키프레임 {keyframeCount}장</span>
+          <span className="px-2 py-1 bg-gray-800 rounded">{keyframeCount} Keyframes</span>
           <span className="px-2 py-1 bg-gray-800 rounded">{steps.stepC.genre}</span>
-          <span className="px-2 py-1 bg-gray-800 rounded">{steps.stepC.duration}초</span>
+          <span className="px-2 py-1 bg-gray-800 rounded">{steps.stepC.duration}s</span>
           <span className="px-2 py-1 bg-gray-800 rounded">
-            음성 대사: {steps.stepC.hasAudioDialogue ? 'O' : 'X'}
+            Audio Dialogue: {steps.stepC.hasAudioDialogue ? 'O' : 'X'}
           </span>
           {transcribe && (
             <span className="px-2 py-1 bg-green-900/50 border border-green-800 rounded text-green-300">
@@ -441,13 +441,13 @@ function DebugView({ data }: { data: ApiResponse }) {
               ? 'bg-green-900/50 border border-green-800 text-green-300'
               : 'bg-red-900/50 border border-red-800 text-red-300'
           }`}>
-            품질: {steps.qualityCheck.valid ? 'PASS' : 'FAIL'}
+            Quality: {steps.qualityCheck.valid ? 'PASS' : 'FAIL'}
           </span>
         </div>
       </div>
 
       {/* 1. Transcribe */}
-      <Section title="1. Transcribe 결과" badge={transcribe ? `${transcribe.segments.length}개 세그먼트` : '없음'} copyText={transcribeCopyText}>
+      <Section title="1. Transcribe Results" badge={transcribe ? `${transcribe.segments.length} segments` : 'None'} copyText={transcribeCopyText}>
         {transcribe && transcribe.segments.length > 0 ? (
           <>
             <div className="space-y-2 mb-3">
@@ -469,30 +469,30 @@ function DebugView({ data }: { data: ApiResponse }) {
             </div>
           </>
         ) : (
-          <p className="text-gray-500 text-sm italic">대사 없음 또는 Transcribe 실패</p>
+          <p className="text-gray-500 text-sm italic">No dialogue or Transcribe failed</p>
         )}
       </Section>
 
       {/* 2. Step A */}
-      <Section title="2. Step A: 대사/오디오 분석" badge={`${steps.stepA.length}자`} copyText={steps.stepA}>
-        <StepHeader step="Pass 1-A" label="대사 화자 식별 + 음성 분류 (Nova Pro)" />
+      <Section title="2. Step A: Dialogue/Audio Analysis" badge={`${steps.stepA.length} chars`} copyText={steps.stepA}>
+        <StepHeader step="Pass 1-A" label="Speaker identification + audio classification (Nova Pro)" />
         <CodeBlock>{steps.stepA}</CodeBlock>
       </Section>
 
       {/* 3. Step B */}
-      <Section title="3. Step B: 상호작용 분석" badge={`${steps.stepB.length}자`} copyText={steps.stepB}>
-        <StepHeader step="Pass 1-B" label="인물 간 상호작용 + 감정 변화 + 인과관계 (Nova Pro)" />
+      <Section title="3. Step B: Interaction Analysis" badge={`${steps.stepB.length} chars`} copyText={steps.stepB}>
+        <StepHeader step="Pass 1-B" label="Character interaction + emotion changes + causality (Nova Pro)" />
         <CodeBlock>{steps.stepB}</CodeBlock>
       </Section>
 
       {/* 4. Step C */}
-      <Section title="4. Step C: 종합 분석 (VideoDeepAnalysis)" badge={`${steps.stepC.characters.length}명, ${steps.stepC.timeline.length}세그먼트`} copyText={JSON.stringify(steps.stepC, null, 2)}>
-        <StepHeader step="Pass 1-C" label="Step A + B → 구조화된 JSON (Nova Pro)" />
+      <Section title="4. Step C: Comprehensive Analysis (VideoDeepAnalysis)" badge={`${steps.stepC.characters.length} characters, ${steps.stepC.timeline.length} segments`} copyText={JSON.stringify(steps.stepC, null, 2)}>
+        <StepHeader step="Pass 1-C" label="Step A + B → Structured JSON (Nova Pro)" />
 
         <div className="space-y-4">
           {/* Story Arc */}
           <div>
-            <h4 className="text-xs text-gray-500 mb-2 uppercase tracking-wide">Story Arc (기승전결)</h4>
+            <h4 className="text-xs text-gray-500 mb-2 uppercase tracking-wide">Story Arc</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {Object.entries(steps.stepC.storyArc).map(([key, val]) => (
                 <div key={key} className="bg-gray-800 rounded-lg p-3">
@@ -556,8 +556,8 @@ function DebugView({ data }: { data: ApiResponse }) {
         </div>
       </Section>
 
-      {/* 5. 품질 검증 */}
-      <Section title="5. 품질 검증" badge={steps.qualityCheck.valid ? 'PASS' : 'FAIL'} copyText={`${steps.qualityCheck.valid ? 'PASS' : 'FAIL'}: ${steps.qualityCheck.reason}`}>
+      {/* 5. Quality Check */}
+      <Section title="5. Quality Check" badge={steps.qualityCheck.valid ? 'PASS' : 'FAIL'} copyText={`${steps.qualityCheck.valid ? 'PASS' : 'FAIL'}: ${steps.qualityCheck.reason}`}>
         <div className={`p-4 rounded-lg ${
           steps.qualityCheck.valid ? 'bg-green-900/20 border border-green-800' : 'bg-red-900/20 border border-red-800'
         }`}>
@@ -570,9 +570,9 @@ function DebugView({ data }: { data: ApiResponse }) {
         </div>
       </Section>
 
-      {/* 6. 반박 검증 */}
-      <Section title="6. 반박 검증 (Verified)" badge="Step C와 비교" copyText={JSON.stringify(steps.verified, null, 2)}>
-        <StepHeader step="Verify" label="반박 질문 기반 검증 → 수정된 VideoDeepAnalysis (Nova Pro)" />
+      {/* 6. Challenge Verification */}
+      <Section title="6. Challenge Verification (Verified)" badge="Compare with Step C" copyText={JSON.stringify(steps.verified, null, 2)}>
+        <StepHeader step="Verify" label="Challenge question verification → Modified VideoDeepAnalysis (Nova Pro)" />
         <DiffHighlight original={steps.stepC} verified={steps.verified} />
         <details className="text-sm mt-3">
           <summary className="cursor-pointer text-gray-500 hover:text-gray-300">Verified Raw JSON</summary>
@@ -580,9 +580,9 @@ function DebugView({ data }: { data: ApiResponse }) {
         </details>
       </Section>
 
-      {/* 7. Pass 2: 패널 구조 */}
-      <Section title="7. Pass 2: 패널 구조" badge={`${steps.pass2.panels.length}개 패널`} copyText={JSON.stringify(steps.pass2, null, 2)}>
-        <StepHeader step="Pass 2" label="만화 패널 구조 추출 (Nova Pro)" />
+      {/* 7. Pass 2: Panel Structure */}
+      <Section title="7. Pass 2: Panel Structure" badge={`${steps.pass2.panels.length} panels`} copyText={JSON.stringify(steps.pass2, null, 2)}>
+        <StepHeader step="Pass 2" label="Comic panel structure extraction (Nova Pro)" />
 
         <div className="space-y-3 mb-4">
           <div className="bg-gray-800 rounded-lg p-3">
@@ -600,7 +600,7 @@ function DebugView({ data }: { data: ApiResponse }) {
             <div className="text-sm text-gray-300">{steps.pass2.characterDescriptions}</div>
           </div>
           <div className="text-xs text-gray-500">
-            Climax Index: <span className="text-yellow-400">패널 {steps.pass2.climaxIndex + 1}</span>
+            Climax Index: <span className="text-yellow-400">Panel {steps.pass2.climaxIndex + 1}</span>
           </div>
         </div>
 
@@ -629,13 +629,13 @@ function DebugView({ data }: { data: ApiResponse }) {
         </div>
       </Section>
 
-      {/* 8. 이미지 생성 프롬프트 */}
-      <Section title="8. 이미지 생성 프롬프트" badge={`${steps.imagePrompts.length}개`} copyText={steps.imagePrompts.map(ip => `[Panel ${ip.panelId}]\n${ip.prompt}\n\nNegative: ${ip.negativeText}`).join('\n\n---\n\n')}>
+      {/* 8. Image Generation Prompts */}
+      <Section title="8. Image Generation Prompts" badge={`${steps.imagePrompts.length}`} copyText={steps.imagePrompts.map(ip => `[Panel ${ip.panelId}]\n${ip.prompt}\n\nNegative: ${ip.negativeText}`).join('\n\n---\n\n')}>
         <div className="space-y-4">
           {steps.imagePrompts.map((ip) => (
             <div key={ip.panelId} className="border border-gray-700 rounded-lg overflow-hidden">
               <div className="px-4 py-2 bg-gray-800 text-sm font-medium text-gray-300">
-                Panel {ip.panelId} — <span className="text-orange-400">{ip.prompt.length}/1024자</span>
+                Panel {ip.panelId} — <span className="text-orange-400">{ip.prompt.length}/1024 chars</span>
               </div>
               <div className="p-4 space-y-2">
                 <div>
@@ -654,8 +654,8 @@ function DebugView({ data }: { data: ApiResponse }) {
         </div>
       </Section>
 
-      {/* 9. 생성된 이미지 vs 장면 설명 */}
-      <Section title="9. 생성된 이미지 vs 장면 설명" badge={`${panels.filter(p => p.imageUrl).length}/${panels.length} 성공`} copyText={panels.map(p => `[Panel ${p.panelId}] ${p.emotion}\n설명: ${p.description}${p.dialogue ? `\n대사(EN): ${p.dialogue}` : ''}${p.dialogueKo ? `\n대사(KO): ${p.dialogueKo}` : ''}${p.imageUrl ? `\n이미지: ${p.imageUrl}` : ''}`).join('\n\n')}>
+      {/* 9. Generated Images vs Scene Descriptions */}
+      <Section title="9. Generated Images vs Scene Descriptions" badge={`${panels.filter(p => p.imageUrl).length}/${panels.length} success`} copyText={panels.map(p => `[Panel ${p.panelId}] ${p.emotion}\nDescription: ${p.description}${p.dialogue ? `\nDialogue(EN): ${p.dialogue}` : ''}${p.dialogueKo ? `\nDialogue(KO): ${p.dialogueKo}` : ''}${p.imageUrl ? `\nImage: ${p.imageUrl}` : ''}`).join('\n\n')}>
         <div className="space-y-6">
           {panels.map((panel, idx) => {
             const isClimax = idx === steps.pass2.climaxIndex;
@@ -669,9 +669,9 @@ function DebugView({ data }: { data: ApiResponse }) {
                   Panel {panel.panelId} {isClimax && '(CLIMAX)'} — {panel.emotion}
                 </div>
                 <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* 이미지 */}
+                  {/* Generated Image */}
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">생성된 이미지</div>
+                    <div className="text-xs text-gray-500 mb-1">Generated Image</div>
                     {panel.imageUrl ? (
                       <img
                         src={panel.imageUrl}
@@ -680,16 +680,16 @@ function DebugView({ data }: { data: ApiResponse }) {
                       />
                     ) : (
                       <div className="w-full aspect-square bg-gray-800 rounded-lg flex items-center justify-center text-gray-600 text-sm">
-                        이미지 생성 실패
+                        Image generation failed
                       </div>
                     )}
                   </div>
 
-                  {/* 장면 설명 + 대사 */}
+                  {/* Scene description + dialogue */}
                   <div className="space-y-2">
                     <div>
                       <div className="text-xs text-gray-500 mb-1">
-                        장면 설명 (description) — <span className="text-orange-400">{panel.description.length}자</span>
+                        Scene Description — <span className="text-orange-400">{panel.description.length} chars</span>
                       </div>
                       <div className="bg-gray-800 rounded-lg p-3 text-sm leading-relaxed">
                         {panel.description}
@@ -697,7 +697,7 @@ function DebugView({ data }: { data: ApiResponse }) {
                     </div>
                     {(panel.dialogue || panel.dialogueKo) && (
                       <div>
-                        <div className="text-xs text-gray-500 mb-1">대사</div>
+                        <div className="text-xs text-gray-500 mb-1">Dialogue</div>
                         <div className="bg-gray-800 rounded-lg p-3 text-sm">
                           {panel.dialogue && <div className="text-blue-300">EN: {panel.dialogue}</div>}
                           {panel.dialogueKo && <div className="text-green-300">KO: {panel.dialogueKo}</div>}
@@ -715,7 +715,7 @@ function DebugView({ data }: { data: ApiResponse }) {
   );
 }
 
-// ─── Step C vs Verified 차이 하이라이트 ───
+// ─── Step C vs Verified Diff Highlight ───
 
 function DiffHighlight({ original, verified }: { original: VideoDeepAnalysis; verified: VideoDeepAnalysis }) {
   const diffs: Array<{ field: string; before: string; after: string }> = [];
@@ -744,8 +744,8 @@ function DiffHighlight({ original, verified }: { original: VideoDeepAnalysis; ve
   if (original.characters.length !== verified.characters.length) {
     diffs.push({
       field: 'characters (count)',
-      before: `${original.characters.length}명`,
-      after: `${verified.characters.length}명`,
+      before: `${original.characters.length} characters`,
+      after: `${verified.characters.length} characters`,
     });
   } else {
     for (let i = 0; i < original.characters.length; i++) {
@@ -755,7 +755,7 @@ function DiffHighlight({ original, verified }: { original: VideoDeepAnalysis; ve
         diffs.push({
           field: `characters[${i}].role (${oc.name})`,
           before: oc.role,
-          after: vc?.role ?? '(없음)',
+          after: vc?.role ?? '(none)',
         });
       }
       if (oc.appearance !== vc?.appearance) {
@@ -776,8 +776,8 @@ function DiffHighlight({ original, verified }: { original: VideoDeepAnalysis; ve
     if (!ot || !vt) {
       diffs.push({
         field: `timeline[${i}]`,
-        before: ot ? ot.description.slice(0, 80) : '(없음)',
-        after: vt ? vt.description.slice(0, 80) : '(없음)',
+        before: ot ? ot.description.slice(0, 80) : '(none)',
+        after: vt ? vt.description.slice(0, 80) : '(none)',
       });
     } else if (ot.description !== vt.description) {
       diffs.push({
@@ -791,14 +791,14 @@ function DiffHighlight({ original, verified }: { original: VideoDeepAnalysis; ve
   if (diffs.length === 0) {
     return (
       <div className="p-4 bg-green-900/20 border border-green-800 rounded-lg text-green-300 text-sm">
-        반박 검증 후 변경 사항 없음 — 원본 분석이 정확합니다
+        No changes after challenge verification — original analysis is accurate
       </div>
     );
   }
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-yellow-400">{diffs.length}개 필드가 검증 후 수정됨</p>
+      <p className="text-sm text-yellow-400">{diffs.length} fields modified after verification</p>
       {diffs.map((d, i) => (
         <div key={i} className="border border-gray-700 rounded-lg overflow-hidden">
           <div className="px-3 py-1.5 bg-gray-800 text-xs font-mono text-gray-400">{d.field}</div>

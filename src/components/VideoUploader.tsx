@@ -22,13 +22,13 @@ export default function VideoUploader({ onUploadComplete, artStyle }: Props) {
 
   const handleFile = useCallback(async (file: File) => {
     if (!file.type.startsWith('video/')) {
-      setError('영상 파일만 업로드할 수 있습니다.');
+      setError('Only video files can be uploaded.');
       return;
     }
 
     const maxSize = 100 * 1024 * 1024;
     if (file.size > maxSize) {
-      setError('파일 크기는 100MB 이하여야 합니다.');
+      setError('File size must be 100MB or less.');
       return;
     }
 
@@ -48,13 +48,13 @@ export default function VideoUploader({ onUploadComplete, artStyle }: Props) {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || '업로드에 실패했습니다');
+        throw new Error(data.error || 'Upload failed');
       }
 
       const { jobId } = await response.json();
       onUploadComplete(jobId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '업로드에 실패했습니다.');
+      setError(err instanceof Error ? err.message : 'Upload failed.');
       setIsUploading(false);
     }
   }, [onUploadComplete]);
@@ -62,7 +62,7 @@ export default function VideoUploader({ onUploadComplete, artStyle }: Props) {
   const handleYouTubeSubmit = useCallback(async () => {
     const trimmed = youtubeUrl.trim();
     if (!trimmed) {
-      setError('YouTube URL을 입력해 주세요.');
+      setError('Please enter a YouTube URL.');
       return;
     }
 
@@ -81,13 +81,13 @@ export default function VideoUploader({ onUploadComplete, artStyle }: Props) {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || 'YouTube 영상 처리에 실패했습니다');
+        throw new Error(data.error || 'Failed to process YouTube video');
       }
 
       const { jobId } = await response.json();
       onUploadComplete(jobId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'YouTube 영상 처리에 실패했습니다.');
+      setError(err instanceof Error ? err.message : 'Failed to process YouTube video.');
       setIsUploading(false);
     }
   }, [youtubeUrl, onUploadComplete]);
@@ -110,19 +110,6 @@ export default function VideoUploader({ onUploadComplete, artStyle }: Props) {
       {/* Tab Switcher */}
       <div className="flex mb-6 bg-gray-900 rounded-xl p-1">
         <button
-          onClick={() => switchMode('file')}
-          disabled={isUploading}
-          className={`
-            flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all duration-200
-            ${mode === 'file'
-              ? 'bg-gray-800 text-white shadow-sm'
-              : 'text-gray-500 hover:text-gray-300'}
-            ${isUploading ? 'cursor-not-allowed opacity-50' : ''}
-          `}
-        >
-          파일 업로드
-        </button>
-        <button
           onClick={() => switchMode('youtube')}
           disabled={isUploading}
           className={`
@@ -133,9 +120,73 @@ export default function VideoUploader({ onUploadComplete, artStyle }: Props) {
             ${isUploading ? 'cursor-not-allowed opacity-50' : ''}
           `}
         >
-          YouTube 링크
+          YouTube Link
+        </button>
+        <button
+          onClick={() => switchMode('file')}
+          disabled={isUploading}
+          className={`
+            flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all duration-200
+            ${mode === 'file'
+              ? 'bg-gray-800 text-white shadow-sm'
+              : 'text-gray-500 hover:text-gray-300'}
+            ${isUploading ? 'cursor-not-allowed opacity-50' : ''}
+          `}
+        >
+          File Upload
         </button>
       </div>
+
+      {/* YouTube Tab */}
+      {mode === 'youtube' && (
+        <div className="border-2 border-gray-800 rounded-2xl p-12 text-center">
+          {isUploading ? (
+            <div className="space-y-4">
+              <div className="w-16 h-16 mx-auto border-4 border-red-500 border-t-transparent rounded-full animate-spin" />
+              <div>
+                <p className="text-white font-medium">Downloading YouTube video...</p>
+                <p className="text-gray-500 text-sm mt-1">This may take a while depending on video length</p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <div className="text-5xl">▶</div>
+                <p className="text-gray-400 text-sm">
+                  Paste a YouTube video URL · Under 10 minutes
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <input
+                  type="url"
+                  value={youtubeUrl}
+                  onChange={(e) => { setYoutubeUrl(e.target.value); setError(null); }}
+                  onKeyDown={(e) => e.key === 'Enter' && handleYouTubeSubmit()}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  className="
+                    flex-1 px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl
+                    text-white placeholder-gray-600 text-sm
+                    focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500
+                    transition-colors
+                  "
+                />
+                <button
+                  onClick={handleYouTubeSubmit}
+                  disabled={!youtubeUrl.trim()}
+                  className="
+                    px-6 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800
+                    disabled:text-gray-600 rounded-xl font-semibold text-sm
+                    transition-colors whitespace-nowrap
+                  "
+                >
+                  Convert
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* File Upload Tab */}
       {mode === 'file' && (
@@ -166,7 +217,7 @@ export default function VideoUploader({ onUploadComplete, artStyle }: Props) {
               <div className="w-16 h-16 mx-auto border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
               <div>
                 <p className="text-white font-medium">{fileName}</p>
-                <p className="text-gray-500 text-sm mt-1">업로드 중...</p>
+                <p className="text-gray-500 text-sm mt-1">Uploading...</p>
               </div>
             </div>
           ) : (
@@ -174,62 +225,11 @@ export default function VideoUploader({ onUploadComplete, artStyle }: Props) {
               <div className="text-6xl">🎬</div>
               <div>
                 <p className="text-xl font-semibold text-white">
-                  영상을 드래그하거나 클릭하세요
+                  Drag and drop a video or click to select
                 </p>
                 <p className="text-gray-500 text-sm mt-2">
-                  MP4, MOV 등 · 최대 100MB · 30초~1분 권장
+                  MP4, MOV, etc. · Max 100MB · 30s–1min recommended
                 </p>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* YouTube Tab */}
-      {mode === 'youtube' && (
-        <div className="border-2 border-gray-800 rounded-2xl p-12 text-center">
-          {isUploading ? (
-            <div className="space-y-4">
-              <div className="w-16 h-16 mx-auto border-4 border-red-500 border-t-transparent rounded-full animate-spin" />
-              <div>
-                <p className="text-white font-medium">YouTube 영상 다운로드 중...</p>
-                <p className="text-gray-500 text-sm mt-1">영상 길이에 따라 시간이 걸릴 수 있습니다</p>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <div className="text-5xl">▶</div>
-                <p className="text-gray-400 text-sm">
-                  YouTube 영상 URL을 붙여넣으세요 · 10분 이하
-                </p>
-              </div>
-
-              <div className="flex gap-3">
-                <input
-                  type="url"
-                  value={youtubeUrl}
-                  onChange={(e) => { setYoutubeUrl(e.target.value); setError(null); }}
-                  onKeyDown={(e) => e.key === 'Enter' && handleYouTubeSubmit()}
-                  placeholder="https://www.youtube.com/watch?v=..."
-                  className="
-                    flex-1 px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl
-                    text-white placeholder-gray-600 text-sm
-                    focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500
-                    transition-colors
-                  "
-                />
-                <button
-                  onClick={handleYouTubeSubmit}
-                  disabled={!youtubeUrl.trim()}
-                  className="
-                    px-6 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800
-                    disabled:text-gray-600 rounded-xl font-semibold text-sm
-                    transition-colors whitespace-nowrap
-                  "
-                >
-                  변환하기
-                </button>
               </div>
             </div>
           )}

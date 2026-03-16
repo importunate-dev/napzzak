@@ -33,8 +33,8 @@ function createSessionEvents(
   const audioContentName = uuidv4();
   const userContentName = uuidv4();
 
-  // Nova Sonic은 speech-to-speech 모델이므로 최소 하나의 오디오 콘텐츠가 필요합니다.
-  // TTS 모드에서는 짧은 무음 오디오를 제공합니다.
+  // Nova Sonic is a speech-to-speech model, so at least one audio content block is required.
+  // In TTS mode, we provide a short silent audio clip.
   // 10ms silence at 24kHz 16-bit mono = 480 bytes
   const silenceBuffer = Buffer.alloc(480).toString('base64');
 
@@ -94,7 +94,7 @@ function createSessionEvents(
         contentEnd: { promptName, contentName: systemContentName },
       },
     },
-    // 오디오 콘텐츠 블록 (Nova Sonic 필수 요구사항)
+    // Audio content block (Nova Sonic requirement)
     {
       event: {
         contentStart: {
@@ -128,7 +128,7 @@ function createSessionEvents(
         contentEnd: { promptName, contentName: audioContentName },
       },
     },
-    // 텍스트 입력 (읽어줄 내용)
+    // Text input (content to be read aloud)
     {
       event: {
         contentStart: {
@@ -165,8 +165,8 @@ function createSessionEvents(
 }
 
 /**
- * Nova 2 Sonic을 사용하여 텍스트를 음성으로 변환합니다.
- * 24kHz 16-bit mono LPCM 오디오 데이터를 반환합니다.
+ * Converts text to speech using Nova 2 Sonic.
+ * Returns 24kHz 16-bit mono LPCM audio data.
  */
 export async function generateSpeech(
   text: string,
@@ -212,14 +212,14 @@ export async function generateSpeech(
   }
 
   if (audioChunks.length === 0) {
-    throw new Error('Nova 2 Sonic이 오디오를 생성하지 못했습니다');
+    throw new Error('Nova 2 Sonic failed to generate audio');
   }
 
   return Buffer.concat(audioChunks);
 }
 
 /**
- * LPCM (24kHz 16bit mono) 데이터를 WAV 포맷으로 변환합니다.
+ * Converts LPCM (24kHz 16bit mono) data to WAV format.
  */
 export function lpcmToWav(pcmData: Buffer): Buffer {
   const sampleRate = 24000;

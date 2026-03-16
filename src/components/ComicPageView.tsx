@@ -9,7 +9,20 @@ interface Props {
   storyJson: StoryJson;
 }
 
-/** 감정별 말풍선 스타일 */
+/** Extract Video ID from YouTube URL */
+function extractYouTubeVideoId(url: string): string | null {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+    /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
+  ];
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+/** Emotion-based speech bubble styles */
 const EMOTION_STYLES: Record<string, string> = {
   joy: 'bg-yellow-50 border-yellow-300 text-yellow-900',
   sadness: 'bg-blue-50 border-blue-300 text-blue-900',
@@ -19,7 +32,7 @@ const EMOTION_STYLES: Record<string, string> = {
   neutral: 'bg-white border-gray-300 text-gray-800',
 };
 
-/** 감정 이모지 */
+/** Emotion emoji */
 const EMOTION_EMOJI: Record<string, string> = {
   joy: '😄',
   sadness: '😢',
@@ -108,14 +121,14 @@ function PanelCard({
         transition-transform hover:scale-[1.02]
       `}
     >
-      {/* 클라이맥스 배지 */}
+      {/* Climax badge */}
       {isClimax && (
         <div className="absolute top-2 right-2 z-20 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full shadow">
           ⭐ CLIMAX
         </div>
       )}
 
-      {/* 패널 이미지 */}
+      {/* Panel image */}
       {hasImage ? (
         <img
           src={panel.imageUrl}
@@ -129,12 +142,12 @@ function PanelCard({
         </div>
       )}
 
-      {/* 대사 오버레이 (CSS로 렌더링 - AI 이미지 텍스트 문제 해결) */}
+      {/* Dialogue overlay (CSS rendered - fixes AI image text issues) */}
       {showDialogue && (
         <DialogueBubble panel={panel} language={language} narration={narration} />
       )}
 
-      {/* 패널 번호 */}
+      {/* Panel number */}
       <div className="absolute top-2 left-2 z-10 bg-black bg-opacity-60 text-white text-xs font-mono px-2 py-0.5 rounded">
         {panel.panelId}
       </div>
@@ -159,9 +172,9 @@ export default function ComicPageView({ storyJson }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* 컨트롤 바 */}
+      {/* Control bar */}
       <div className="flex flex-wrap items-center justify-center gap-3">
-        {/* 뷰 모드 전환 (패널별 / 단일 페이지) */}
+        {/* View mode toggle (per-panel / single page) */}
         {hasPanelImages && hasPageImage && (
           <div className="inline-flex bg-gray-800 rounded-lg p-0.5">
             <button
@@ -172,7 +185,7 @@ export default function ComicPageView({ storyJson }: Props) {
                   : 'text-gray-400 hover:text-white'
               }`}
             >
-              🖼️ 패널별
+              🖼️ Panels
             </button>
             <button
               onClick={() => setViewMode('page')}
@@ -182,12 +195,12 @@ export default function ComicPageView({ storyJson }: Props) {
                   : 'text-gray-400 hover:text-white'
               }`}
             >
-              📄 단일 페이지
+              📄 Single Page
             </button>
           </div>
         )}
 
-        {/* 대사 토글 */}
+        {/* Dialogue toggle */}
         {hasDialogue && viewMode === 'panel' && (
           <button
             onClick={() => setShowDialogue(!showDialogue)}
@@ -197,11 +210,11 @@ export default function ComicPageView({ storyJson }: Props) {
                 : 'bg-gray-800 text-gray-400 hover:text-white'
             }`}
           >
-            💬 {showDialogue ? '대사 ON' : '대사 OFF'}
+            💬 {showDialogue ? 'Dialogue ON' : 'Dialogue OFF'}
           </button>
         )}
 
-        {/* 언어 전환 */}
+        {/* Language toggle */}
         {hasDialogue && showDialogue && viewMode === 'panel' && (
           <div className="inline-flex bg-gray-800 rounded-lg p-0.5">
             <button
@@ -228,16 +241,45 @@ export default function ComicPageView({ storyJson }: Props) {
         )}
       </div>
 
-      {/* 스토리 요약 */}
+      {/* Story summary */}
       <div className="text-center">
         <p className="text-gray-400 text-sm italic">
           &ldquo;{language === 'ko' && storyJson.summaryKo ? storyJson.summaryKo : storyJson.summary}&rdquo;
         </p>
       </div>
 
-      {/* 만화 렌더링 */}
+      {/* YouTube video */}
+      {storyJson.youtubeUrl && (() => {
+        const videoId = extractYouTubeVideoId(storyJson.youtubeUrl!);
+        if (!videoId) return null;
+        return (
+          <div className="max-w-2xl mx-auto space-y-2">
+            <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+              <iframe
+                className="absolute inset-0 w-full h-full rounded-xl"
+                src={`https://www.youtube.com/embed/${videoId}`}
+                title="Original YouTube Video"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+            <p className="text-center text-xs text-gray-500">
+              <a
+                href={storyJson.youtubeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-gray-300 underline"
+              >
+                View original video
+              </a>
+            </p>
+          </div>
+        );
+      })()}
+
+      {/* Comic rendering */}
       {viewMode === 'panel' ? (
-        /* 패널별 그리드 렌더링 */
+        /* Per-panel grid rendering */
         <div
           className={`grid gap-4 ${
             storyJson.panels.length <= 4
@@ -257,7 +299,7 @@ export default function ComicPageView({ storyJson }: Props) {
           ))}
         </div>
       ) : (
-        /* 단일 페이지 렌더링 (레거시) */
+        /* Single page rendering (legacy) */
         hasPageImage && (
           <div className="max-w-3xl mx-auto">
             <img
@@ -269,11 +311,11 @@ export default function ComicPageView({ storyJson }: Props) {
         )
       )}
 
-      {/* 캐릭터 정보 (디버그/참고용) */}
+      {/* Character info (debug/reference) */}
       {storyJson.characterDescriptions && (
         <details className="text-xs text-gray-600 mt-4">
           <summary className="cursor-pointer hover:text-gray-400">
-            🎭 캐릭터 정보
+            🎭 Character Info
           </summary>
           <p className="mt-2 p-3 bg-gray-900 rounded-lg">
             {storyJson.characterDescriptions}

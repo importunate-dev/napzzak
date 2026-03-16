@@ -13,19 +13,19 @@ export async function POST(request: NextRequest) {
     };
 
     if (!jobId || !artStyle) {
-      return NextResponse.json({ error: 'jobId와 artStyle이 필요합니다' }, { status: 400 });
+      return NextResponse.json({ error: 'jobId and artStyle are required' }, { status: 400 });
     }
 
     const storyJson = await loadStoryJson(jobId);
     if (!storyJson) {
-      return NextResponse.json({ error: '작업을 찾을 수 없습니다' }, { status: 404 });
+      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
     if (!storyJson.panels || storyJson.panels.length === 0) {
-      return NextResponse.json({ error: '패널 정보가 없습니다' }, { status: 400 });
+      return NextResponse.json({ error: 'No panel information available' }, { status: 400 });
     }
 
-    console.log(`[Restyle ${jobId}] 그림체 변경: ${artStyle}`);
+    console.log(`[Restyle ${jobId}] Style change: ${artStyle}`);
 
     const comicPageBuffer = await generateSingleComicPage(storyJson.panels, artStyle);
 
@@ -35,13 +35,13 @@ export async function POST(request: NextRequest) {
 
     await saveStoryJson(jobId, storyJson);
 
-    console.log(`[Restyle ${jobId}] 완료`);
+    console.log(`[Restyle ${jobId}] Complete`);
 
     return NextResponse.json({ storyJson });
   } catch (err) {
-    console.error('[Restyle] 오류:', err);
+    console.error('[Restyle] Error:', err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : '그림체 변경 중 오류가 발생했습니다' },
+      { error: err instanceof Error ? err.message : 'An error occurred while changing the art style' },
       { status: 500 }
     );
   }

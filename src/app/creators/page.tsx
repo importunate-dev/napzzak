@@ -2,10 +2,10 @@ import Link from 'next/link';
 import { OctopusMascot, RaccoonMascot } from '@/components/Mascots';
 
 const creators = [
-  { name: '이태용', email: 'taeyong.lee@saladlab.co', image: '/taeyong.png' },
-  { name: '김원', email: 'one.kim@saladlab.co', image: '/one.png' },
-  { name: '배준수', email: 'junsu.bae@saladlab.co', image: '/junsu.png' },
-  { name: '안동혁', email: 'donghyeok.ahn@saladlab.co', image: '/donghyuk.png' },
+  { name: 'Taeyong Lee', email: 'taeyong.lee@saladlab.co', image: '/taeyong.png' },
+  { name: 'Won Kim', email: 'one.kim@saladlab.co', image: '/one.png' },
+  { name: 'Junsu Bae', email: 'junsu.bae@saladlab.co', image: '/junsu.png' },
+  { name: 'Donghyeok Ahn', email: 'donghyeok.ahn@saladlab.co', image: '/donghyuk.png' },
 ];
 
 export default function CreatorsPage() {
@@ -16,14 +16,14 @@ export default function CreatorsPage() {
           <div className="flex items-center justify-center gap-4 mb-4">
             <OctopusMascot size={48} />
             <h1 className="text-4xl font-black tracking-tight">
-              만든 <span className="text-purple-500">사람들</span>
+              The <span className="text-purple-500">Creators</span>
             </h1>
             <RaccoonMascot size={48} />
           </div>
-          <p className="text-gray-400 mb-6">납짝을 만든 개발자들을 소개합니다</p>
+          <p className="text-gray-400 mb-6">Meet the developers behind Napzzak</p>
           <img
             src="/core_family.png"
-            alt="제작자 단체사진"
+            alt="Team photo"
             className="mx-auto w-[280px] h-auto rounded-2xl border border-gray-800 shadow-lg"
           />
         </header>
@@ -50,7 +50,7 @@ export default function CreatorsPage() {
             href="/"
             className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors"
           >
-            &larr; 메인으로 돌아가기
+            &larr; Back to Home
           </Link>
         </div>
       </div>

@@ -9,24 +9,24 @@ export async function POST(request: NextRequest) {
     const { text, voiceId } = body;
 
     if (!text || typeof text !== 'string') {
-      return NextResponse.json({ error: '텍스트가 필요합니다' }, { status: 400 });
+      return NextResponse.json({ error: 'Text is required' }, { status: 400 });
     }
 
     if (text.length > 500) {
-      return NextResponse.json({ error: '텍스트는 500자 이하여야 합니다' }, { status: 400 });
+      return NextResponse.json({ error: 'Text must be 500 characters or less' }, { status: 400 });
     }
 
     const resolvedVoice = voiceId || 'matthew';
     const pcmAudio = await generateSpeech(text, resolvedVoice);
     const wavAudio = lpcmToWav(pcmAudio);
 
-    // Buffer → ArrayBuffer 안전 변환 (Node.js Buffer 공유 풀 이슈 방지)
+    // Safe Buffer → ArrayBuffer conversion (prevents Node.js Buffer shared pool issue)
     const arrayBuffer = wavAudio.buffer.slice(
       wavAudio.byteOffset,
       wavAudio.byteOffset + wavAudio.byteLength
     );
 
-    return new NextResponse(arrayBuffer, {
+    return new NextResponse(arrayBuffer as ArrayBuffer, {
       headers: {
         'Content-Type': 'audio/wav',
         'Content-Length': wavAudio.byteLength.toString(),
@@ -34,9 +34,9 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('[Narrate] 음성 생성 실패:', error);
+    console.error('[Narrate] Speech generation failed:', error);
     return NextResponse.json(
-      { error: '음성 생성에 실패했습니다' },
+      { error: 'Failed to generate speech' },
       { status: 500 }
     );
   }

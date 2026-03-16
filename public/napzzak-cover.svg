@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0a0a"/>
+      <stop offset="50%" style="stop-color:#111827"/>
+      <stop offset="100%" style="stop-color:#0a0a0a"/>
+    </linearGradient>
+    <linearGradient id="titleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#a78bfa"/>
+      <stop offset="50%" style="stop-color:#60a5fa"/>
+      <stop offset="100%" style="stop-color:#a78bfa"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Subtle grid pattern -->
+  <g opacity="0.03">
+    <line x1="0" y1="0" x2="1200" y2="630" stroke="#fff" stroke-width="1"/>
+    <line x1="1200" y1="0" x2="0" y2="630" stroke="#fff" stroke-width="1"/>
+    <circle cx="600" cy="315" r="200" fill="none" stroke="#fff" stroke-width="1"/>
+    <circle cx="600" cy="315" r="300" fill="none" stroke="#fff" stroke-width="1"/>
+  </g>
+
+  <!-- Purple glow behind octopus -->
+  <circle cx="420" cy="320" r="120" fill="#8B2FC9" opacity="0.08"/>
+  <!-- Blue glow behind raccoon -->
+  <circle cx="780" cy="320" r="120" fill="#4A90E2" opacity="0.08"/>
+
+  <!-- === 납이 (Octopus Mascot) === -->
+  <g transform="translate(340, 210) scale(6)" style="image-rendering: pixelated" filter="url(#shadow)">
+    <!-- Head -->
+    <rect x="4" y="1" width="8" height="7" fill="#8B2FC9"/>
+    <rect x="3" y="2" width="10" height="5" fill="#8B2FC9"/>
+    <!-- Eye whites -->
+    <rect x="5" y="3" width="2" height="2" fill="#000"/>
+    <rect x="9" y="3" width="2" height="2" fill="#000"/>
+    <!-- Eye highlights -->
+    <rect x="5" y="3" width="1" height="1" fill="#fff"/>
+    <rect x="9" y="3" width="1" height="1" fill="#fff"/>
+    <!-- Mouth -->
+    <rect x="7" y="6" width="1" height="1" fill="#000"/>
+    <rect x="8" y="5" width="1" height="1" fill="#000"/>
+    <!-- Body -->
+    <rect x="4" y="8" width="8" height="3" fill="#8B2FC9"/>
+    <!-- Legs -->
+    <rect x="2" y="9" width="2" height="4" fill="#7A1FB8"/>
+    <rect x="2" y="13" width="2" height="1" fill="#6A15A0"/>
+    <rect x="5" y="10" width="2" height="4" fill="#7A1FB8"/>
+    <rect x="5" y="14" width="2" height="1" fill="#6A15A0"/>
+    <rect x="9" y="10" width="2" height="4" fill="#7A1FB8"/>
+    <rect x="9" y="14" width="2" height="1" fill="#6A15A0"/>
+    <rect x="12" y="9" width="2" height="4" fill="#7A1FB8"/>
+    <rect x="12" y="13" width="2" height="1" fill="#6A15A0"/>
+  </g>
+
+  <!-- 납이 label -->
+  <text x="420" y="520" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="18" fill="#a78bfa" font-weight="600" opacity="0.8">Nabi</text>
+
+  <!-- === 짝이 (Raccoon Knight Mascot) === -->
+  <g transform="translate(700, 195) scale(6)" style="image-rendering: pixelated" filter="url(#shadow)">
+    <!-- Helmet -->
+    <rect x="4" y="0" width="8" height="4" fill="#888"/>
+    <rect x="3" y="1" width="10" height="3" fill="#999"/>
+    <rect x="5" y="0" width="6" height="1" fill="#aaa"/>
+    <!-- Gold decoration -->
+    <rect x="6" y="1" width="4" height="1" fill="#F5A623"/>
+    <!-- Raccoon face -->
+    <rect x="3" y="4" width="10" height="6" fill="#C8A882"/>
+    <!-- Eye mask -->
+    <rect x="3" y="5" width="4" height="3" fill="#555"/>
+    <rect x="9" y="5" width="4" height="3" fill="#555"/>
+    <!-- Eyes -->
+    <rect x="4" y="6" width="2" height="1" fill="#fff"/>
+    <rect x="10" y="6" width="2" height="1" fill="#fff"/>
+    <rect x="5" y="6" width="1" height="1" fill="#4A90E2"/>
+    <rect x="10" y="6" width="1" height="1" fill="#4A90E2"/>
+    <!-- Nose -->
+    <rect x="7" y="8" width="2" height="1" fill="#333"/>
+    <!-- Body (blue armor) -->
+    <rect x="3" y="10" width="10" height="5" fill="#4A90E2"/>
+    <rect x="4" y="11" width="8" height="3" fill="#357ABD"/>
+    <!-- Red scarf -->
+    <rect x="3" y="10" width="10" height="2" fill="#D0021B"/>
+    <!-- Arms -->
+    <rect x="1" y="10" width="2" height="4" fill="#C8A882"/>
+    <rect x="13" y="10" width="2" height="4" fill="#C8A882"/>
+    <!-- Legs -->
+    <rect x="4" y="15" width="3" height="4" fill="#8B6914"/>
+    <rect x="9" y="15" width="3" height="4" fill="#8B6914"/>
+  </g>
+
+  <!-- 짝이 label -->
+  <text x="780" y="520" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="18" fill="#60a5fa" font-weight="600" opacity="0.8">Zzagi</text>
+
+  <!-- "Napzzak" Title -->
+  <text x="600" y="130" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="800" fill="url(#titleGrad)" filter="url(#glow)" letter-spacing="-2">
+    Napzzak
+  </text>
+
+  <!-- Subtitle -->
+  <text x="600" y="170" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="20" fill="#9ca3af" font-weight="400">
+    Video to Comic, Squished by AI
+  </text>
+
+  <!-- Bottom tag -->
+  <rect x="460" y="565" width="280" height="32" rx="16" fill="#1f2937" opacity="0.8"/>
+  <text x="600" y="586" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#6b7280" font-weight="500">
+    Powered by Amazon Nova
+  </text>
+</svg>

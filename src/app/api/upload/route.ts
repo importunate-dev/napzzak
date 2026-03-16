@@ -12,16 +12,16 @@ export async function POST(request: NextRequest) {
   const artStyle = (formData.get('artStyle') as ArtStyle) || 'GRAPHIC_NOVEL_ILLUSTRATION';
 
   if (!file) {
-    return NextResponse.json({ error: '영상 파일이 필요합니다' }, { status: 400 });
+    return NextResponse.json({ error: 'A video file is required' }, { status: 400 });
   }
 
   if (!file.type.startsWith('video/')) {
-    return NextResponse.json({ error: '영상 파일만 업로드 가능합니다' }, { status: 400 });
+    return NextResponse.json({ error: 'Only video files can be uploaded' }, { status: 400 });
   }
 
   const maxSize = 100 * 1024 * 1024;
   if (file.size > maxSize) {
-    return NextResponse.json({ error: '파일 크기는 100MB 이하여야 합니다' }, { status: 400 });
+    return NextResponse.json({ error: 'File size must be 100MB or less' }, { status: 400 });
   }
 
   const jobId = uuidv4();
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
   await createJob(jobId, 'file');
 
   processVideo(jobId, buffer, artStyle).catch((error) => {
-    console.error(`[Job ${jobId}] 처리 실패:`, error);
+    console.error(`[Job ${jobId}] Processing failed:`, error);
     void updateJob(jobId, { status: 'failed', error: error.message });
   });
 

@@ -48,7 +48,7 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobId, artStyle: newStyle }),
       });
-      if (!res.ok) throw new Error('그림체 변경 실패');
+      if (!res.ok) throw new Error('Style change failed');
       const data = await res.json();
       setStoryJson(data.storyJson);
     } catch (err) {
@@ -62,12 +62,12 @@ export default function Home() {
   return (
     <main className="min-h-screen">
       <div className="max-w-5xl mx-auto px-4 py-12">
-        {/* 헤더: 마스코트 폴짝 + 납짝 타이틀 */}
+        {/* Header: Mascot bounce + Napzzak title */}
         <header className="mb-12">
           <div className="flex flex-col items-center gap-4">
             <MainBounceAnimation />
             <p className="text-gray-400 text-lg">
-              영상을 올리면, AI가 만화로 납짝 만들어 드려요
+              Upload a video, and AI will squish it into a comic for you
             </p>
           </div>
         </header>
@@ -82,7 +82,7 @@ export default function Home() {
                 />
               </div>
               <p className="text-center text-gray-600 text-xs">
-                그림체를 선택한 뒤 영상을 올려주세요 (대사 없는 시각적 만화로 변환됩니다)
+                Select an art style and upload a video (converts to a visual comic without dialogue)
               </p>
             </div>
             <VideoUploader
@@ -117,7 +117,7 @@ export default function Home() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  그림체 변환 중...
+                  Changing art style...
                 </div>
               </div>
             )}
@@ -130,7 +130,7 @@ export default function Home() {
                   onClick={handleReset}
                   className="px-8 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-semibold transition-colors"
                 >
-                  다른 영상 변환하기
+                  Convert another video
                 </button>
               </div>
               {(storyJson.modelsUsed ?? storyJson.novaModelsUsed)?.length ? (
@@ -143,13 +143,13 @@ export default function Home() {
             </div>
           </>
         )}
-        {/* 제작자 페이지 링크 */}
+        {/* Creators page link */}
         <div className="text-center mt-12 pb-4">
           <Link
             href="/creators"
             className="text-sm text-gray-500 hover:text-purple-400 transition-colors"
           >
-            제작자 &rarr;
+            Creators &rarr;
           </Link>
         </div>
       </div>

@@ -9,12 +9,12 @@ interface Props {
 }
 
 const EMOTION_STYLES: Record<string, { border: string; label: string }> = {
-  joy: { border: 'border-yellow-400', label: '기쁨' },
-  sadness: { border: 'border-blue-400', label: '슬픔' },
-  surprise: { border: 'border-purple-400', label: '놀람' },
-  anger: { border: 'border-red-400', label: '분노' },
-  fear: { border: 'border-gray-400', label: '공포' },
-  neutral: { border: 'border-gray-600', label: '평온' },
+  joy: { border: 'border-yellow-400', label: 'Joy' },
+  sadness: { border: 'border-blue-400', label: 'Sadness' },
+  surprise: { border: 'border-purple-400', label: 'Surprise' },
+  anger: { border: 'border-red-400', label: 'Anger' },
+  fear: { border: 'border-gray-400', label: 'Fear' },
+  neutral: { border: 'border-gray-600', label: 'Neutral' },
 };
 
 export default function ScrollComic({ storyJson }: Props) {
@@ -50,7 +50,7 @@ export default function ScrollComic({ storyJson }: Props) {
                 <div className="flex items-center justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <span className="text-xs text-gray-500">
-                    패널 {panel.panelId}
+                    Panel {panel.panelId}
                     {isClimax && <span className="ml-2 text-yellow-400 font-medium">CLIMAX</span>}
                   </span>
                   {displayText(panel) && <p className="text-gray-300 text-sm mt-1">{displayText(panel)}</p>}

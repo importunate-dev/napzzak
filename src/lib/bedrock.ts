@@ -13,7 +13,7 @@ const PRO_MODEL_ID = 'us.amazon.nova-pro-v1:0';
 
 const bedrockClient = new BedrockRuntimeClient({ region: REGION });
 
-// ─── Pass 1: 영상 심층 분석 결과 ───
+// ─── Pass 1: Video Deep Analysis Result ───
 
 export interface VideoDeepAnalysis {
   duration: number;
@@ -40,7 +40,7 @@ export interface VideoDeepAnalysis {
   keyMoments: string[];
 }
 
-// ─── Pass 2: 만화 패널 구조 ───
+// ─── Pass 2: Comic Panel Structure ───
 
 export interface NovaAnalysisResult {
   duration: number;
@@ -49,27 +49,29 @@ export interface NovaAnalysisResult {
   climaxIndex: number;
   hasAudioDialogue: boolean;
   characterDescriptions: string;
+  setting?: string;
   panels: Array<{
     panelId: number;
     description: string;
     emotion: string;
     dialogue?: string;
     dialogueKo?: string;
+    narrativeContext?: string;
   }>;
 }
 
-// ─── 유틸: Bedrock 호출 + JSON 파싱 ───
+// ─── Util: Bedrock Call + JSON Parsing ───
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractTextFromResponse(response: any): string {
   const outputContent = response?.output?.message?.content;
   if (!outputContent || outputContent.length === 0) {
-    throw new Error('Bedrock: 빈 응답');
+    throw new Error('Bedrock: empty response');
   }
 
   const textBlock = outputContent.find((b: ContentBlock) => 'text' in b);
   if (!textBlock || !('text' in textBlock)) {
-    throw new Error('Bedrock: 텍스트 없음');
+    throw new Error('Bedrock: no text content');
   }
 
   return textBlock.text as string;
@@ -78,7 +80,7 @@ function extractTextFromResponse(response: any): string {
 function parseJsonFromText<T>(text: string): T {
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    throw new Error('JSON 파싱 불가: ' + text.slice(0, 300));
+    throw new Error('JSON parse failed: ' + text.slice(0, 300));
   }
   return JSON.parse(jsonMatch[0]) as T;
 }
@@ -105,7 +107,7 @@ function buildFrameContentBlocks(frameImages: string[]): ContentBlock[] {
 
 
 // ─────────────────────────────────────────────
-// Pass 1 Step A: 대사/오디오 검증
+// Pass 1 Step A: Dialogue/Audio Verification
 // ─────────────────────────────────────────────
 
 export async function stepA_DialogueVerification(
@@ -134,15 +136,15 @@ The speaker labels (spk_0, spk_1) are NOT mapped to specific people yet. YOUR JO
 1. ⚠️ DURATION GUARD — HIGHEST PRIORITY ⚠️: ${duration ? `This video is EXACTLY ${duration} seconds long. You MUST NOT generate ANY observations, timestamps, or analysis beyond ${duration} seconds. If you find yourself writing timestamps past ${duration}s, STOP IMMEDIATELY. Any content beyond the video duration is HALLUCINATION. Your audio inventory MUST contain at most ${maxEntries} entries total. If you exceed this limit, you are being too granular — consolidate.` : `The video is SHORT (likely under 60 seconds). DO NOT generate or hallucinate timestamps beyond the actual video duration. Stop your analysis when the video ends. Your audio inventory MUST contain at most ${maxEntries} entries. If you find yourself repeating similar observations, STOP immediately.`}
 
 2. CONSOLIDATION RULE — MERGE REPETITIVE PATTERNS: If a sound pattern repeats (e.g., vocal mimicry alternating with laughter, repeated knocking, back-and-forth banter), do NOT list each individual occurrence. Instead, merge them into a SINGLE time-range entry.
-   BAD (too granular): "[14.0s] 성대모사", "[14.2s] 웃음", "[14.4s] 성대모사", "[14.6s] 웃음" ...
-   GOOD (consolidated): "[14.0s-15.0s] 성대모사 패턴: 남성이 반복적으로 전화벨 모사, 여성이 웃음 (~4회 반복)"
+   BAD (too granular): "[14.0s] vocal mimicry", "[14.2s] laughter", "[14.4s] vocal mimicry", "[14.6s] laughter" ...
+   GOOD (consolidated): "[14.0s-15.0s] vocal mimicry pattern: man repeatedly imitates phone ringtone, woman laughs (~4 repetitions)"
    This rule applies to ALL repetitive or alternating sound patterns. One consolidated entry per pattern, not one entry per 0.2-second occurrence.
 
 ABSOLUTE PRIORITY RULE — SPEAKER ATTRIBUTION:
 You MUST determine WHO produces each sound by matching these cues IN THIS EXACT ORDER:
-3. LIP SYNC (최우선): Whose mouth/lips are physically moving at the EXACT moment the sound is heard?
+3. LIP SYNC (highest priority): Whose mouth/lips are physically moving at the EXACT moment the sound is heard?
 4. PHYSICAL ACTION: Who is performing a physical action that matches the sound (e.g., hands cupped around mouth, leaning toward someone)?
-5. REACTION ANALYSIS (보조): If lip movements are not visible, the person who shows SURPRISE/CONFUSION is the LISTENER, not the producer.
+5. REACTION ANALYSIS (supplementary): If lip movements are not visible, the person who shows SURPRISE/CONFUSION is the LISTENER, not the producer.
 Do NOT assign a sound to someone just because they are on camera. The camera often shows the REACTOR, not the PRODUCER.
 
 METHODOLOGY - you MUST follow these steps:
@@ -243,29 +245,29 @@ For each mapping, use lip movement evidence and visual cues to determine which v
 
   let text = extractTextFromResponse(response);
 
-  // 후처리: duration을 초과하는 타임스탬프가 포함된 줄 필터링
+  // Post-processing: filter out lines containing timestamps beyond duration
   if (duration) {
-    const maxTime = duration + 1; // 1초 허용 오차
+    const maxTime = duration + 1; // 1 second tolerance
     text = text
       .split('\n')
       .filter((line) => {
-        // [12.3s] 또는 [12.3s-14.5s] 패턴에서 타임스탬프 추출
+        // Extract timestamp from [12.3s] or [12.3s-14.5s] patterns
         const match = line.match(/\[(\d+(?:\.\d+)?)s/);
-        if (!match) return true; // 타임스탬프 없는 줄은 유지
+        if (!match) return true; // Keep lines without timestamps
         return parseFloat(match[1]) <= maxTime;
       })
       .join('\n');
   }
 
-  console.log(`[Nova Step A] 대사 분석 완료 (${text.length}자)`);
+  console.log(`[Nova Step A] Dialogue analysis complete (${text.length} chars)`);
   return text;
 }
 
 // ─────────────────────────────────────────────
-// Pass 1 Step B: 상호작용 중심 행동 분석 (인물 간 인과관계 포커스)
+// Pass 1 Step B: Interaction-Focused Action Analysis (Character Causality Focus)
 // ─────────────────────────────────────────────
 
-/** Step B: 인물 간 상호작용 + 감정 변화 + 인과관계를 시간순으로 분석 */
+/** Step B: Chronological analysis of inter-character interactions + emotional changes + causality */
 export async function stepB_ActionSequenceAnalysis(
   s3Uri: string,
   bucketOwner: string,
@@ -363,12 +365,12 @@ Respond in plain text.`,
   );
 
   const text = extractTextFromResponse(response);
-  console.log(`[Nova Step B] 상호작용 분석 완료 (${text.length}자)`);
+  console.log(`[Nova Step B] Interaction analysis complete (${text.length} chars)`);
   return text;
 }
 
 // ─────────────────────────────────────────────
-// Pass 1 Step C: 종합 (Step A + B → JSON)
+// Pass 1 Step C: Synthesis (Step A + B → JSON)
 // ─────────────────────────────────────────────
 
 export async function stepC_Synthesis(
@@ -394,7 +396,7 @@ ABSOLUTE PRIORITY RULES for resolving conflicts:
 4. CAUSE → EFFECT order → Trust Step B's merged timeline and cause-effect analysis
 5. If Step A says "Person X spoke" but Step B's individual tracking of Person X shows their mouth was closed → trust Step B
 6. ZERO GENDER BIAS: Do NOT default to "man = prankster, woman = reactor". Read Step A and Step B carefully — if they say the WOMAN initiated the action, then the woman is the initiator. Trust the evidence from the analysis steps, not stereotypes.
-7. LOGICAL CONFLICT RESOLUTION: Step A와 Step B의 내용이 논리적으로 모순될 경우 (예: A가 장난을 시작했다고 하는데 B가 장난의 결말을 짓는다고 하는 등), Transcribe 텍스트의 전체 맥락과 영상의 인과관계를 바탕으로 직접 모순을 해결하라. 단순히 "대사는 A, 행동은 B"를 따르지 말고, 전체 스토리의 논리적 일관성을 우선하라.
+7. LOGICAL CONFLICT RESOLUTION: If Step A and Step B are logically contradictory (e.g., A says the prank was initiated by one person while B says another person concludes it), resolve the contradiction directly based on the full context of the Transcribe text and the causal chain of the video. Do not simply follow "dialogue = A, action = B" — prioritize the logical consistency of the overall story.
 8. SPEAKER CONFLICT RESOLUTION: If Step A and Step B disagree about WHO produced a specific sound:
    - For SPOKEN WORDS (Dialogue): Trust Step A (lip movement analysis).
    - For NON-VERBAL SOUNDS & MIMICRY (e.g., imitating a ringtone): Trust Step B completely. Step B tracks cause-and-effect better. If Step B says the woman initiated the prank, DO NOT trust Step A's misattribution.
@@ -422,7 +424,7 @@ ${stepBResult}
 === CONFLICT ANALYSIS (Step D: Debate Agent) ===
 ${debateResult}
 === END CONFLICT ANALYSIS ===
-위 모순 해결 결과를 반드시 따르세요. Debate Agent의 판정이 Step A/B 개별 결론보다 우선합니다.` : ''}${transcriptNote}
+You MUST follow the conflict resolution result above. The Debate Agent's verdict takes priority over the individual conclusions of Step A/B.` : ''}${transcriptNote}
 
 SYNTHESIS RULES:
 1. For "speakers" field: Use Step A's speaker-to-appearance mapping. Each speaker must be identified by their VISUAL APPEARANCE.
@@ -430,7 +432,7 @@ SYNTHESIS RULES:
 3. If Step A and Step B conflict about WHO does an action, trust Step B's interaction analysis.
 4. Pay special attention to Step B's PRETEND/PRANK analysis and CAUSE → EFFECT chain.
 5. For pretend/mimicry actions: clearly state WHO is pretending and that it is pretend, not real.
-6. You MUST fill in the "storyArc" field to structure the story as a proper narrative (기승전결).
+6. You MUST fill in the "storyArc" field to structure the story as a proper narrative (setup → inciting incident → climax → resolution).
 7. VOCAL MIMICRY AS ACTION: If Step A or Step B identifies someone imitating a sound (e.g., phone ringtone, doorbell) with their voice, this MUST appear in the timeline as a distinct action by that person. It is often the INCITING INCIDENT that triggers the entire scene. Include it in the timeline description (e.g., "Woman imitates phone ringtone sound with her voice") and in the cause-effect chain.
 
 Return JSON:
@@ -446,10 +448,10 @@ Return JSON:
     }
   ],
   "storyArc": {
-    "setup": "<초기 상황 설명 — 평온한 상태, 인물들의 위치와 분위기>",
-    "incitingIncident": "<사건의 발단 — 갈등/오해/문제가 시작되는 구체적 행동>",
-    "climax": "<갈등이 폭발하거나 가장 중요한 행동이 일어나는 순간>",
-    "resolution": "<결과 및 감정적 마무리>"
+    "setup": "<initial situation description — calm state, characters' positions and atmosphere>",
+    "incitingIncident": "<story trigger — the specific action that starts the conflict/misunderstanding/problem>",
+    "climax": "<the moment the conflict explodes or the most important action occurs>",
+    "resolution": "<outcome and emotional wrap-up>"
   },
   "timeline": [
     {
@@ -493,22 +495,22 @@ FINAL CHECK before responding:
       if (!result.timeline) result.timeline = [];
       if (!result.storyArc) result.storyArc = { setup: '', incitingIncident: '', climax: '', resolution: '' };
 
-      console.log(`[Nova Step C] 종합 완료: ${result.characters.length}명, ${result.timeline.length}개 세그먼트`);
+      console.log(`[Nova Step C] Synthesis complete: ${result.characters.length} characters, ${result.timeline.length} segments`);
       return result;
     } catch (err) {
       if (attempt < MAX_RETRIES) {
-        console.warn(`[Nova Step C] 오류, 재시도 (${attempt + 1}): ${err}`);
+        console.warn(`[Nova Step C] Error, retrying (${attempt + 1}): ${err}`);
         continue;
       }
       throw err;
     }
   }
 
-  throw new Error('Nova Step C: 최대 재시도 초과');
+  throw new Error('Nova Step C: max retries exceeded');
 }
 
 // ─────────────────────────────────────────────
-// Pass 1 Step D: 모순 해결 (Debate Agent)
+// Pass 1 Step D: Contradiction Resolution (Debate Agent)
 // ─────────────────────────────────────────────
 
 export async function stepD_ContradictionResolution(
@@ -563,19 +565,19 @@ If there are NO contradictions, state that the analyses are consistent.`,
     );
 
     const text = extractTextFromResponse(response);
-    console.log(`[Nova Step D] 모순 해결 완료 (${text.length}자)`);
+    console.log(`[Nova Step D] Contradiction resolution complete (${text.length} chars)`);
     return text;
   } catch (err) {
-    console.warn(`[Nova Step D] 모순 해결 실패 (스킵):`, err);
+    console.warn(`[Nova Step D] Contradiction resolution failed (skipping):`, err);
     return '';
   }
 }
 
 // ─────────────────────────────────────────────
-// 후처리 함수들
+// Post-processing functions
 // ─────────────────────────────────────────────
 
-/** 타임라인에서 duration 초과 항목 제거 */
+/** Remove timeline entries exceeding duration */
 function trimTimelineToDuration(analysis: VideoDeepAnalysis, duration: number): VideoDeepAnalysis {
   const filtered = analysis.timeline.filter(t => {
     const match = t.timeRange.match(/(\d+):(\d+(?:\.\d+)?)/);
@@ -589,7 +591,7 @@ function trimTimelineToDuration(analysis: VideoDeepAnalysis, duration: number): 
   return { ...analysis, timeline: filtered };
 }
 
-/** 중복 인물 병합 (이름에 "same as" 등이 포함된 경우) */
+/** Merge duplicate characters (when name contains "same as" etc.) */
 function deduplicateCharacters(analysis: VideoDeepAnalysis): VideoDeepAnalysis {
   const dominated = new Set<number>();
   for (let i = 0; i < analysis.characters.length; i++) {
@@ -607,7 +609,7 @@ function deduplicateCharacters(analysis: VideoDeepAnalysis): VideoDeepAnalysis {
   return analysis;
 }
 
-/** 패널 대사 중복 제거 + SFX를 dialogue에서 제거 */
+/** Remove duplicate panel dialogue + remove SFX from dialogue field */
 function deduplicatePanelDialogue(panels: Array<{ panelId: number; description: string; emotion: string; dialogue?: string; dialogueKo?: string }>): typeof panels {
   const SFX_PATTERNS = /^(\*[^*]+\*|SFX:|sound effect|ringtone|ding dong|ring ring|buzzing|beeping|ringing)/i;
 
@@ -638,7 +640,7 @@ function deduplicatePanelDialogue(panels: Array<{ panelId: number; description: 
 }
 
 // ─────────────────────────────────────────────
-// Pass 1 통합: 3단계 Chain-of-Thought
+// Pass 1 Integration: 3-Step Chain-of-Thought
 // ─────────────────────────────────────────────
 
 export async function analyzeVideoDeep(
@@ -652,13 +654,13 @@ export async function analyzeVideoDeep(
 ): Promise<VideoDeepAnalysis> {
   const { transcriptText, frameImages, duration } = options || {};
 
-  console.log('[Nova Pass 1] Step A: 대사/오디오 검증 시작...');
+  console.log('[Nova Pass 1] Step A: Dialogue/audio verification starting...');
   const stepAResult = await stepA_DialogueVerification(s3Uri, bucketOwner, transcriptText, frameImages, duration);
 
-  console.log('[Nova Pass 1] Step B: 행동 순서 분석 시작...');
+  console.log('[Nova Pass 1] Step B: Action sequence analysis starting...');
   const stepBResult = await stepB_ActionSequenceAnalysis(s3Uri, bucketOwner, transcriptText, frameImages, duration);
 
-  console.log('[Nova Pass 1] Step C: 종합 시작...');
+  console.log('[Nova Pass 1] Step C: Synthesis starting...');
   let result = await stepC_Synthesis(s3Uri, bucketOwner, stepAResult, stepBResult, transcriptText, duration);
 
   // Post-processing
@@ -669,7 +671,7 @@ export async function analyzeVideoDeep(
 }
 
 // ─────────────────────────────────────────────
-// 품질 검증 게이트
+// Quality validation gate
 // ─────────────────────────────────────────────
 
 export function validatePass1Quality(result: VideoDeepAnalysis): { valid: boolean; reason: string } {
@@ -695,7 +697,7 @@ export function validatePass1Quality(result: VideoDeepAnalysis): { valid: boolea
 }
 
 // ─────────────────────────────────────────────
-// 반박 질문 기반 검증 (Adversarial Verification)
+// Challenge question-based verification (Adversarial Verification)
 // ─────────────────────────────────────────────
 
 export async function verifyAnalysis(
@@ -739,7 +741,7 @@ GENDER BIAS WARNING: Do NOT assume men are pranksters and women are victims/obse
    - Is it correctly identified as the CAUSE/TRIGGER for other people's reactions?
    - A person imitating a ringtone to make someone else answer the phone is a PRANK — the imitator is the prankster, not the person who answers.
 
-7. DIALOGUE INTENT CHECK: 등장인물의 대사가 장난의 일부(Punchline)인지, 아니면 상대방의 장난에 대한 진심어린 반응(Annoyance/Reaction)인지 영상의 표정과 앞뒤 맥락을 보고 다시 평가하라.
+7. DIALOGUE INTENT CHECK: Re-evaluate whether each character's dialogue is part of the prank (Punchline) or a genuine reaction to the other person's prank (Annoyance/Reaction) by reviewing the facial expressions and surrounding context in the video.
 
 8. SPEAKER CONFLICT CHECK: For each sound/dialogue, compare Step A and Step B attribution in the analysis. If they disagreed, which evidence is stronger (lip movement vs reaction inference)? Fix the attribution accordingly.
 
@@ -763,21 +765,379 @@ After answering these questions, return the CORRECTED analysis as JSON with the 
     const text = extractTextFromResponse(response);
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      console.warn('[Nova Verify] JSON 파싱 실패, 원본 분석 유지');
+      console.warn('[Nova Verify] JSON parsing failed, keeping original analysis');
       return analysis;
     }
 
     const verified = JSON.parse(jsonMatch[0]) as VideoDeepAnalysis;
-    console.log('[Nova Verify] 반박 검증 완료');
+    console.log('[Nova Verify] Challenge verification complete');
     return verified;
   } catch (err) {
-    console.warn('[Nova Verify] 검증 실패, 원본 분석 유지:', err);
+    console.warn('[Nova Verify] Verification failed, keeping original analysis:', err);
     return analysis;
   }
 }
 
 // ─────────────────────────────────────────────
-// Pass 2: 심층 분석 기반 만화 패널 구조 추출
+// Pass 2 multi-agent: Panel splitting
+// ─────────────────────────────────────────────
+
+interface PlannerResult {
+  selectedMoments: Array<{
+    index: number;
+    timeRange: string;
+    storyRole: 'setup' | 'inciting_incident' | 'climax' | 'resolution';
+    reason: string;
+  }>;
+  climaxIndex: number;
+}
+
+interface ConsolidatedCharacters {
+  combined: string;
+  perCharacter: Array<{ name: string; visualDescription: string }>;
+}
+
+interface SceneDescription {
+  panelId: number;
+  description: string;
+  emotion: string;
+  dialogue: string;
+  dialogueKo: string;
+  narrativeContext: string;
+}
+
+interface ReviewResult {
+  approved: boolean;
+  issues: string[];
+  fixes: Array<{ panelId: number; field: string; suggestion: string }>;
+}
+
+/**
+ * P-A: Panel Planner — Select 4 key scenes from story arc
+ */
+async function agentPanelPlanner(
+  deepAnalysis: VideoDeepAnalysis
+): Promise<PlannerResult> {
+  const systemPrompt: SystemContentBlock = {
+    text: `You are a comic panel planner. Given a video story analysis, select exactly 4 key moments that best represent the story arc (kishōtenketsu: setup → inciting incident → climax → resolution).
+
+You MUST respond with valid JSON only. No markdown, no explanation.`,
+  };
+
+  const timelineSummary = deepAnalysis.timeline
+    .map((t, i) => `[${i}] ${t.timeRange}: ${t.description}${t.dialogue ? ` (Dialogue: "${t.dialogue}")` : ''}`)
+    .join('\n');
+
+  const userMessage: Message = {
+    role: 'user',
+    content: [{
+      text: `Story Analysis:
+Genre: ${deepAnalysis.genre}
+Duration: ${deepAnalysis.duration}s
+
+Story Arc:
+  Setup: ${deepAnalysis.storyArc.setup}
+  Inciting Incident: ${deepAnalysis.storyArc.incitingIncident}
+  Climax: ${deepAnalysis.storyArc.climax}
+  Resolution: ${deepAnalysis.storyArc.resolution}
+
+Full Story: ${deepAnalysis.fullStorySummary}
+
+Key Moments:
+${deepAnalysis.keyMoments.map((m, i) => `  ${i + 1}. ${m}`).join('\n')}
+
+Timeline (select from these):
+${timelineSummary}
+
+Select exactly 4 timeline entries that best map to the kishōtenketsu structure.
+Return JSON:
+{
+  "selectedMoments": [
+    { "index": <timeline index>, "timeRange": "<time>", "storyRole": "<setup|inciting_incident|climax|resolution>", "reason": "<why this moment>" }
+  ],
+  "climaxIndex": <0-based index within selectedMoments that is the climax>
+}`,
+    }],
+  };
+
+  const response = await bedrockClient.send(
+    new ConverseCommand({
+      modelId: PRO_MODEL_ID,
+      messages: [userMessage],
+      system: [systemPrompt],
+      inferenceConfig: { maxTokens: 2048, temperature: 0.2, topP: 0.9 },
+    })
+  );
+
+  return parseJsonFromText<PlannerResult>(extractTextFromResponse(response));
+}
+
+/**
+ * P-C: Character Consolidator — Consolidate character appearance descriptions for image prompts
+ */
+async function agentCharacterConsolidator(
+  deepAnalysis: VideoDeepAnalysis
+): Promise<ConsolidatedCharacters> {
+  const systemPrompt: SystemContentBlock = {
+    text: `You are a character description specialist for comic image generation. Consolidate character appearances into concise visual descriptions optimized for AI image generation prompts.
+
+Focus ONLY on visible physical traits: hair color/style, clothing, body type, distinguishing features. Do NOT include personality, role, or story information.
+
+You MUST respond with valid JSON only.`,
+  };
+
+  const charList = deepAnalysis.characters
+    .map(c => `- ${c.name}: ${c.appearance} (Role: ${c.role})`)
+    .join('\n');
+
+  const userMessage: Message = {
+    role: 'user',
+    content: [{
+      text: `Characters from video analysis:
+${charList}
+
+Create two outputs:
+1. A single "combined" string (max 300 chars) describing ALL characters together for image prompt injection
+2. Per-character visual descriptions (max 80 chars each)
+
+Return JSON:
+{
+  "combined": "<all characters combined visual description>",
+  "perCharacter": [
+    { "name": "<name>", "visualDescription": "<concise visual traits>" }
+  ]
+}`,
+    }],
+  };
+
+  const response = await bedrockClient.send(
+    new ConverseCommand({
+      modelId: PRO_MODEL_ID,
+      messages: [userMessage],
+      system: [systemPrompt],
+      inferenceConfig: { maxTokens: 2048, temperature: 0.15, topP: 0.9 },
+    })
+  );
+
+  return parseJsonFromText<ConsolidatedCharacters>(extractTextFromResponse(response));
+}
+
+/**
+ * P-B: Scene Descriptor — Write detailed physical scene descriptions for each panel
+ */
+async function agentSceneDescriptor(
+  s3Uri: string,
+  bucketOwner: string,
+  deepAnalysis: VideoDeepAnalysis,
+  plannerResult: PlannerResult,
+  characters: ConsolidatedCharacters
+): Promise<SceneDescription[]> {
+  const systemPrompt: SystemContentBlock = {
+    text: `You are a comic scene descriptor. For each selected moment, write a detailed PHYSICAL scene description suitable for AI image generation.
+
+RULES:
+- Describe ONLY visible elements: body positions, facial expressions, spatial arrangement, lighting
+- Start each description with shot type: "Wide shot:", "Medium shot:", or "Close-up:"
+- Do NOT use abstract verbs: "realizes", "pretends", "thinks", "notices" — convert to physical actions
+- Do NOT repeat character appearance (hair, clothing) — that info is injected separately
+- Use short identifiers like "dark-haired woman" or "man in blue shirt"
+- Each description should be 200-350 characters
+- Dialogue field is for SPOKEN WORDS ONLY, not sound effects
+
+You MUST respond with valid JSON only.`,
+  };
+
+  const selectedMoments = plannerResult.selectedMoments.map((m, i) => {
+    const timeline = deepAnalysis.timeline[m.index] || deepAnalysis.timeline[0];
+    return `Panel ${i + 1} (${m.storyRole}):
+  Time: ${m.timeRange}
+  Event: ${timeline.description}
+  ${timeline.dialogue ? `Dialogue: "${timeline.dialogue}"` : 'No dialogue'}
+  ${timeline.speakers?.length ? `Speakers: ${timeline.speakers.join(', ')}` : ''}`;
+  }).join('\n\n');
+
+  const userMessage: Message = {
+    role: 'user',
+    content: [
+      buildVideoContentBlock(s3Uri, bucketOwner),
+      {
+        text: `Characters: ${characters.combined}
+
+Selected moments for 4 panels:
+${selectedMoments}
+
+Story context: ${deepAnalysis.fullStorySummary}
+
+For each panel, write a detailed physical scene description.
+Return JSON array:
+[
+  {
+    "panelId": 1,
+    "description": "<200-350 char physical scene description>",
+    "emotion": "<joy|sadness|surprise|anger|fear|neutral>",
+    "dialogue": "<spoken words in English, or empty string>",
+    "dialogueKo": "<Korean translation, or empty string>",
+    "narrativeContext": "<story role in 1 sentence, e.g., 'Setup: A man sits alone at a table, contemplating'>"
+  }
+]`,
+      },
+    ],
+  };
+
+  const response = await bedrockClient.send(
+    new ConverseCommand({
+      modelId: PRO_MODEL_ID,
+      messages: [userMessage],
+      system: [systemPrompt],
+      inferenceConfig: { maxTokens: 4096, temperature: 0.25, topP: 0.9 },
+    })
+  );
+
+  const text = extractTextFromResponse(response);
+  // Response may be an array or { panels: [...] } format
+  const arrMatch = text.match(/\[[\s\S]*\]/);
+  if (arrMatch) {
+    return JSON.parse(arrMatch[0]) as SceneDescription[];
+  }
+  const objResult = parseJsonFromText<{ panels: SceneDescription[] }>(text);
+  return objResult.panels;
+}
+
+/**
+ * P-D: Panel Reviewer — Final verification (dialogue duplication, climax check, character consistency)
+ */
+async function agentPanelReviewer(
+  scenes: SceneDescription[],
+  plannerResult: PlannerResult,
+  deepAnalysis: VideoDeepAnalysis
+): Promise<ReviewResult> {
+  const systemPrompt: SystemContentBlock = {
+    text: `You are a comic panel quality reviewer. Check the final panel set for:
+1. Dialogue duplication — same dialogue should NOT appear in multiple panels
+2. Story completeness — all 4 story arc beats (setup, inciting incident, climax, resolution) must be present
+3. Climax alignment — the most dramatic panel should match the climax index
+4. Character consistency — all major characters should appear where expected
+5. Description quality — no abstract verbs, proper physical descriptions
+
+You MUST respond with valid JSON only.`,
+  };
+
+  const userMessage: Message = {
+    role: 'user',
+    content: [{
+      text: `Story summary: ${deepAnalysis.fullStorySummary}
+Expected climax index: ${plannerResult.climaxIndex}
+
+Panels to review:
+${JSON.stringify(scenes, null, 2)}
+
+Review and return JSON:
+{
+  "approved": <true if all checks pass>,
+  "issues": ["<issue description>", ...],
+  "fixes": [
+    { "panelId": <number>, "field": "<field name>", "suggestion": "<fix>" }
+  ]
+}`,
+    }],
+  };
+
+  const response = await bedrockClient.send(
+    new ConverseCommand({
+      modelId: PRO_MODEL_ID,
+      messages: [userMessage],
+      system: [systemPrompt],
+      inferenceConfig: { maxTokens: 2048, temperature: 0.1, topP: 0.9 },
+    })
+  );
+
+  return parseJsonFromText<ReviewResult>(extractTextFromResponse(response));
+}
+
+/**
+ * Multi-agent panel splitting orchestrator
+ *
+ * P-A(Planner) + P-C(CharConsolidator) parallel → P-B(SceneDescriptor) → P-D(Reviewer)
+ * Falls back to existing extractPanelStructure on failure
+ */
+export async function extractPanelStructureMultiAgent(
+  s3Uri: string,
+  bucketOwner: string,
+  deepAnalysis: VideoDeepAnalysis,
+  onProgress?: (stage: AnalysisStage) => void
+): Promise<NovaAnalysisResult> {
+  try {
+    // Phase 1: P-A + P-C parallel execution
+    console.log('[Multi-Agent Pass 2] P-A(Planner) + P-C(CharConsolidator) parallel start...');
+    onProgress?.('pass2_planning');
+    const [plannerResult, characters] = await Promise.all([
+      agentPanelPlanner(deepAnalysis),
+      agentCharacterConsolidator(deepAnalysis),
+    ]);
+    console.log(`[Multi-Agent Pass 2] P-A complete: ${plannerResult.selectedMoments.length} scenes selected, climax=${plannerResult.climaxIndex}`);
+    console.log(`[Multi-Agent Pass 2] P-C complete: "${characters.combined.slice(0, 80)}..."`);
+
+    // Phase 2: P-B (Scene Descriptor) — depends on P-A + P-C results
+    console.log('[Multi-Agent Pass 2] P-B(SceneDescriptor) starting...');
+    onProgress?.('pass2_describing');
+    let scenes = await agentSceneDescriptor(s3Uri, bucketOwner, deepAnalysis, plannerResult, characters);
+
+    // Fallback if fewer than 4
+    if (!scenes || scenes.length < 4) {
+      console.warn(`[Multi-Agent Pass 2] P-B result has insufficient panels (${scenes?.length}), falling back`);
+      return extractPanelStructure(s3Uri, bucketOwner, deepAnalysis);
+    }
+    // Trim if more than 4
+    if (scenes.length > 4) {
+      scenes = scenes.slice(0, 4);
+    }
+
+    // Phase 3: P-D (Reviewer) — Verify P-B results
+    console.log('[Multi-Agent Pass 2] P-D(Reviewer) starting...');
+    onProgress?.('pass2_reviewing');
+    const review = await agentPanelReviewer(scenes, plannerResult, deepAnalysis);
+    console.log(`[Multi-Agent Pass 2] P-D complete: approved=${review.approved}, issues=${review.issues.length}`);
+
+    // Apply reviewer-suggested fixes
+    if (!review.approved && review.fixes.length > 0) {
+      for (const fix of review.fixes) {
+        const panel = scenes.find(s => s.panelId === fix.panelId);
+        if (panel && fix.field in panel) {
+          console.log(`[Multi-Agent Pass 2] Applying fix: panel ${fix.panelId}.${fix.field}`);
+          (panel as unknown as Record<string, unknown>)[fix.field] = fix.suggestion;
+        }
+      }
+    }
+
+    // Assemble NovaAnalysisResult
+    const result: NovaAnalysisResult = {
+      duration: deepAnalysis.duration,
+      summary: deepAnalysis.fullStorySummary,
+      summaryKo: undefined,
+      climaxIndex: plannerResult.climaxIndex,
+      hasAudioDialogue: deepAnalysis.hasAudioDialogue,
+      characterDescriptions: characters.combined,
+      setting: undefined,
+      panels: scenes.map((s, i) => ({
+        panelId: s.panelId || i + 1,
+        description: s.description,
+        emotion: s.emotion,
+        dialogue: s.dialogue || undefined,
+        dialogueKo: s.dialogueKo || undefined,
+        narrativeContext: s.narrativeContext || undefined,
+      })),
+    };
+
+    console.log(`[Multi-Agent Pass 2] Multi-agent panel structure complete: ${result.panels.length} panels`);
+    return result;
+  } catch (err) {
+    console.warn(`[Multi-Agent Pass 2] Multi-agent failed, falling back to legacy method:`, err);
+    return extractPanelStructure(s3Uri, bucketOwner, deepAnalysis);
+  }
+}
+
+// ─────────────────────────────────────────────
+// Pass 2: Comic panel structure extraction based on deep analysis (legacy single agent, for fallback)
 // ─────────────────────────────────────────────
 
 export async function extractPanelStructure(
@@ -803,7 +1163,7 @@ export async function extractPanelStructure(
     .join('\n');
 
   const storyArcBriefing = deepAnalysis.storyArc
-    ? `\nStory Arc (기승전결):\n  Setup: ${deepAnalysis.storyArc.setup}\n  Inciting Incident: ${deepAnalysis.storyArc.incitingIncident}\n  Climax: ${deepAnalysis.storyArc.climax}\n  Resolution: ${deepAnalysis.storyArc.resolution}\n`
+    ? `\nStory Arc (kishōtenketsu):\n  Setup: ${deepAnalysis.storyArc.setup}\n  Inciting Incident: ${deepAnalysis.storyArc.incitingIncident}\n  Climax: ${deepAnalysis.storyArc.climax}\n  Resolution: ${deepAnalysis.storyArc.resolution}\n`
     : '';
 
   const analysisContext = `=== VIDEO ANALYSIS BRIEFING ===
@@ -852,7 +1212,7 @@ You MUST respond with valid JSON only. No markdown, no explanation.`,
         text: `Here is the detailed analysis of this video:
 ${analysisContext}
 
-Now create 4 to 6 comic panels that tell this story visually.
+Now create exactly 4 comic panels that tell this story visually.
 
 Return JSON with this exact structure:
 {
@@ -862,13 +1222,15 @@ Return JSON with this exact structure:
   "climaxIndex": <0-based index of the most dramatic/important panel>,
   "hasAudioDialogue": ${deepAnalysis.hasAudioDialogue},
   "characterDescriptions": "<combined visual description of ALL characters for consistent image generation>",
+  "setting": "<A single-sentence description of the FIXED location/environment where the story takes place. e.g., 'A modern kitchen with a wooden dining table and warm overhead lighting.' This will be prepended to every panel's image prompt.>",
   "panels": [
     {
       "panelId": 1,
-      "description": "<200-350 char PHYSICAL scene description. The image AI can ONLY draw visible objects and poses. Describe: exact body positions, hand placement and held objects, facial muscle movements (raised eyebrows, open mouth, furrowed brow), spatial arrangement, setting, lighting. NEVER use 'pretending', 'trying', 'realizes', 'about to' — convert to concrete poses. Do NOT repeat character appearance (hair, clothing) — that is already in characterDescriptions. Use short identifiers like 'dark-haired woman' only.>",
+      "description": "<200-350 char PHYSICAL scene description. CRITICAL RULE: You MUST describe the physical state and location of EVERY character present in the scene, not just the one performing the action. For example, if character A is making a prank call, also describe character B sitting at the table looking at their phone. Describe spatial arrangement between all characters (e.g., 'Woman standing behind the seated man'). The image AI can ONLY draw visible objects and poses. Describe: exact body positions, hand placement and held objects, facial muscle movements (raised eyebrows, open mouth, furrowed brow), spatial arrangement, lighting. Start each description with a shot type: 'Wide shot:', 'Medium shot:', or 'Close-up:' to maintain visual coherence between panels. NEVER use 'pretending', 'trying', 'realizes', 'about to' — convert to concrete poses. Do NOT repeat character appearance (hair, clothing) — that is already in characterDescriptions. Use short identifiers like 'dark-haired woman' only.>",
       "emotion": "<one of: joy, sadness, surprise, anger, fear, neutral>",
       "dialogue": "<key dialogue in this moment in ENGLISH, or empty string if none>",
-      "dialogueKo": "<same dialogue translated to Korean, or empty string>"
+      "dialogueKo": "<same dialogue translated to Korean, or empty string>",
+      "narrativeContext": "narrativeContext": "<Describe the role of this panel in the story arc in one short ENGLISH sentence.>"
     }
   ]
 }
@@ -913,45 +1275,52 @@ CRITICAL RULES:
 
       if (!result.panels || result.panels.length < 4) {
         if (attempt < MAX_RETRIES) {
-          console.warn(`[Nova Pass 2] 패널 수 부족 (${result.panels?.length}개), 재시도`);
+          console.warn(`[Nova Pass 2] Insufficient panels (${result.panels?.length}), retrying`);
           continue;
         }
-        throw new Error(`Nova Pass 2: 패널 부족 (${result.panels?.length}개)`);
+        throw new Error(`Nova Pass 2: Insufficient panels (${result.panels?.length})`);
+      }
+
+      // Trim if more than 4 panels
+      if (result.panels.length > 4) {
+        console.log(`[Nova Pass 2] Trimmed ${result.panels.length} panels → 4`);
+        result.panels = result.panels.slice(0, 4);
+        result.climaxIndex = Math.min(result.climaxIndex, 3);
       }
 
       if (!result.characterDescriptions) {
         result.characterDescriptions = charDescs;
       }
 
-      console.log(`[Nova Pass 2] 패널 구조 완료: ${result.panels.length}개 패널`);
+      console.log(`[Nova Pass 2] Panel structure complete: ${result.panels.length} panels`);
       return result;
     } catch (err) {
       if (attempt < MAX_RETRIES) {
-        console.warn(`[Nova Pass 2] 오류, 재시도 (${attempt + 1}): ${err}`);
+        console.warn(`[Nova Pass 2] Error, retrying (${attempt + 1}): ${err}`);
         continue;
       }
       throw err;
     }
   }
 
-  throw new Error('Nova Pass 2: 최대 재시도 초과');
+  throw new Error('Nova Pass 2: Max retries exceeded');
 }
 
 // ─────────────────────────────────────────────
-// 통합 분석 함수 (외부에서 호출)
+// Integrated analysis function (called externally)
 // ─────────────────────────────────────────────
 
-export type AnalysisStage = 'transcribing' | 'pass1_stepA' | 'pass1_stepB' | 'pass1_debate' | 'pass1_stepC' | 'verifying' | 'pass2';
+export type AnalysisStage = 'transcribing' | 'pass1_stepA' | 'pass1_stepB' | 'pass1_debate' | 'pass1_stepC' | 'verifying' | 'pass2' | 'pass2_planning' | 'pass2_describing' | 'pass2_reviewing';
 
 /**
- * 개선된 영상 분석 파이프라인
+ * Improved video analysis pipeline
  *
- * Pass 1: 3단계 Chain-of-Thought 심층 분석
- *   Step A: 대사/오디오 검증 (Transcribe 결과 활용)
- *   Step B: 행동 순서 + 인과관계 분석
- *   Step C: 종합 JSON 생성
- * Verification: 반박 질문 기반 검증
- * Pass 2: 만화 패널 구조 추출
+ * Pass 1: 3-step Chain-of-Thought deep analysis
+ *   Step A: Dialogue/audio verification (using Transcribe results)
+ *   Step B: Action sequence + causality analysis
+ *   Step C: Comprehensive JSON generation
+ * Verification: Challenge question-based verification
+ * Pass 2: Comic panel structure extraction
  */
 export async function analyzeVideo(
   s3Uri: string,
@@ -965,17 +1334,17 @@ export async function analyzeVideo(
 ): Promise<NovaAnalysisResult> {
   const { transcriptText, frameImages, duration } = options || {};
 
-  console.log('[Nova] === 개선된 분석 파이프라인 시작 ===');
-  if (duration) console.log(`[Nova] 영상 길이: ${duration}s`);
+  console.log('[Nova] === Starting improved analysis pipeline ===');
+  if (duration) console.log(`[Nova] Video duration: ${duration}s`);
   if (transcriptText) {
-    console.log(`[Nova] Transcribe 텍스트 제공됨 (${transcriptText.length}자)`);
+    console.log(`[Nova] Transcribe text provided (${transcriptText.length} chars)`);
   }
   if (frameImages?.length) {
-    console.log(`[Nova] 키프레임 ${frameImages.length}장 제공됨`);
+    console.log(`[Nova] ${frameImages.length} keyframes provided`);
   }
 
-  // Pass 1: 3단계 CoT 심층 분석 (Step A + B 병렬 실행)
-  console.log('[Nova] Pass 1 Step A + B: 병렬 분석 시작...');
+  // Pass 1: 3-step CoT deep analysis (Step A + B parallel execution)
+  console.log('[Nova] Pass 1 Step A + B: Starting parallel analysis...');
   onProgress?.('pass1_stepA');
   onProgress?.('pass1_stepB');
   const [stepAResult, stepBResult] = await Promise.all([
@@ -983,59 +1352,59 @@ export async function analyzeVideo(
     stepB_ActionSequenceAnalysis(s3Uri, bucketOwner, transcriptText, frameImages, duration),
   ]);
 
-  console.log('[Nova] Pass 1 Step D: 모순 해결 중...');
+  console.log('[Nova] Pass 1 Step D: Resolving contradictions...');
   onProgress?.('pass1_debate');
   const debateResult = await stepD_ContradictionResolution(stepAResult, stepBResult, duration);
 
-  console.log('[Nova] Pass 1 Step C: 종합 중...');
+  console.log('[Nova] Pass 1 Step C: Synthesizing...');
   onProgress?.('pass1_stepC');
   let deepAnalysis = await stepC_Synthesis(s3Uri, bucketOwner, stepAResult, stepBResult, transcriptText, duration, debateResult);
   if (duration) deepAnalysis.duration = duration;
-  console.log(`[Nova] Pass 1 완료: "${deepAnalysis.fullStorySummary.slice(0, 100)}..."`);
+  console.log(`[Nova] Pass 1 complete: "${deepAnalysis.fullStorySummary.slice(0, 100)}..."`);
 
   // Post-processing: timeline trim + character dedup
   if (duration) deepAnalysis = trimTimelineToDuration(deepAnalysis, duration);
   deepAnalysis = deduplicateCharacters(deepAnalysis);
 
-  // 품질 검증 게이트
+  // Quality validation gate
   const qualityCheck = validatePass1Quality(deepAnalysis);
   if (!qualityCheck.valid) {
-    console.warn(`[Nova] Pass 1 품질 불합격: ${qualityCheck.reason} — 재시도`);
+    console.warn(`[Nova] Pass 1 quality check failed: ${qualityCheck.reason} — retrying`);
     deepAnalysis = await stepC_Synthesis(s3Uri, bucketOwner, stepAResult, stepBResult, transcriptText, duration, debateResult);
     if (duration) deepAnalysis.duration = duration;
     if (duration) deepAnalysis = trimTimelineToDuration(deepAnalysis, duration);
     deepAnalysis = deduplicateCharacters(deepAnalysis);
     const retryCheck = validatePass1Quality(deepAnalysis);
     if (!retryCheck.valid) {
-      console.warn(`[Nova] Pass 1 재시도에도 품질 불합격: ${retryCheck.reason} — 진행`);
+      console.warn(`[Nova] Pass 1 quality still failed after retry: ${retryCheck.reason} — proceeding`);
     }
   }
 
-  // 반박 질문 기반 검증
-  console.log('[Nova] 반박 검증 중...');
+  // Challenge question-based verification
+  console.log('[Nova] Running challenge verification...');
   onProgress?.('verifying');
   deepAnalysis = await verifyAnalysis(s3Uri, bucketOwner, deepAnalysis);
   if (duration) deepAnalysis.duration = duration;
   // Post-processing on verified result too
   if (duration) deepAnalysis = trimTimelineToDuration(deepAnalysis, duration);
   deepAnalysis = deduplicateCharacters(deepAnalysis);
-  console.log('[Nova] 검증 완료');
+  console.log('[Nova] Verification complete');
 
-  // Pass 2: 패널 구조 추출
-  console.log('[Nova] Pass 2: 만화 패널 구조 추출 중...');
+  // Pass 2: Extracting multi-agent panel structure
+  console.log('[Nova] Pass 2: Extracting multi-agent panel structure...');
   onProgress?.('pass2');
-  const panelStructure = await extractPanelStructure(s3Uri, bucketOwner, deepAnalysis);
+  const panelStructure = await extractPanelStructureMultiAgent(s3Uri, bucketOwner, deepAnalysis, onProgress);
 
   // Post-processing: deduplicate panel dialogues
   panelStructure.panels = deduplicatePanelDialogue(panelStructure.panels);
-  console.log(`[Nova] Pass 2 완료: ${panelStructure.panels.length}개 패널`);
+  console.log(`[Nova] Pass 2 complete: ${panelStructure.panels.length} panels`);
 
-  console.log('[Nova] === 분석 파이프라인 완료 ===');
+  console.log('[Nova] === Analysis pipeline complete ===');
   return panelStructure;
 }
 
 /**
- * 레거시 호환: 기존 1-pass 방식 (필요 시 폴백용)
+ * Legacy compatibility: existing 1-pass method (for fallback if needed)
  */
 export async function analyzeVideoLegacy(
   s3Uri: string,
@@ -1044,7 +1413,7 @@ export async function analyzeVideoLegacy(
   const systemPrompt: SystemContentBlock = {
     text: `You are an expert video analyst and comic storyteller.
 Your job is to watch a video and understand the ENTIRE story from beginning to end.
-Then distill it into 4 to 6 panels that will form a SINGLE comic page.
+Then distill it into exactly 4 panels that will form a SINGLE comic page.
 These panels will be rendered as a SILENT comic - NO dialogue, NO speech bubbles. Visual storytelling only.
 
 You MUST respond with valid JSON only. No markdown, no explanation, no extra text.`,
@@ -1093,7 +1462,7 @@ Return JSON:
   const result = parseJsonFromText<NovaAnalysisResult>(text);
 
   if (!result.panels || result.panels.length < 4) {
-    throw new Error(`패널 부족: ${result.panels?.length}`);
+    throw new Error(`Insufficient panels: ${result.panels?.length}`);
   }
 
   return result;

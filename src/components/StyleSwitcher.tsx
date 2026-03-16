@@ -9,10 +9,10 @@ interface Props {
 }
 
 const STYLES: { id: ArtStyle; label: string; desc: string }[] = [
-  { id: 'GRAPHIC_NOVEL_ILLUSTRATION', label: 'Graphic Novel', desc: '만화체' },
-  { id: 'SOFT_DIGITAL_PAINTING',      label: 'Watercolor',    desc: '수채화풍' },
-  { id: 'FLAT_VECTOR_ILLUSTRATION',   label: 'Flat Vector',   desc: '일러스트' },
-  { id: '3D_ANIMATED_FAMILY_FILM',    label: '3D Animation',  desc: '3D 애니' },
+  { id: 'GRAPHIC_NOVEL_ILLUSTRATION', label: 'Graphic Novel', desc: 'Comic' },
+  { id: 'SOFT_DIGITAL_PAINTING',      label: 'Watercolor',    desc: 'Watercolor' },
+  { id: 'FLAT_VECTOR_ILLUSTRATION',   label: 'Flat Vector',   desc: 'Illustration' },
+  { id: '3D_ANIMATED_FAMILY_FILM',    label: '3D Animation',  desc: '3D Animated' },
 ];
 
 export default function StyleSwitcher({ current, onChange, disabled }: Props) {

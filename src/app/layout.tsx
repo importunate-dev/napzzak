@@ -8,13 +8,13 @@ const notoSansKR = Noto_Sans_KR({
 });
 
 export const metadata: Metadata = {
-  title: '납짝 | 영상을 4컷 만화로',
-  description: 'AI가 영상을 분석하여 4컷 만화로 자동 변환합니다. Powered by Amazon Nova.',
+  title: 'Napzzak | Turn Videos into Comics',
+  description: 'AI analyzes your video and automatically converts it into a comic strip. Powered by Amazon Nova.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko">
+    <html lang="en">
       <body className={notoSansKR.className}>{children}</body>
     </html>
   );

@@ -1,19 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 16 16" style="image-rendering:pixelated">
-  <!-- 머리 -->
+  <!-- Head -->
   <rect x="4" y="1" width="8" height="7" fill="#8B2FC9"/>
   <rect x="3" y="2" width="10" height="5" fill="#8B2FC9"/>
-  <!-- 눈 -->
+  <!-- Eyes -->
   <rect x="5" y="3" width="2" height="2" fill="#000"/>
   <rect x="9" y="3" width="2" height="2" fill="#000"/>
   <rect x="5" y="3" width="1" height="1" fill="#fff"/>
   <rect x="9" y="3" width="1" height="1" fill="#fff"/>
-  <!-- 입 -->
+  <!-- Mouth -->
   <rect x="6" y="6" width="4" height="1" fill="#000"/>
   <rect x="5" y="5" width="1" height="1" fill="#000"/>
   <rect x="10" y="5" width="1" height="1" fill="#000"/>
-  <!-- 몸통 -->
+  <!-- Body -->
   <rect x="4" y="8" width="8" height="3" fill="#8B2FC9"/>
-  <!-- 다리 -->
+  <!-- Legs -->
   <rect x="2" y="9" width="2" height="4" fill="#7A1FB8"/>
   <rect x="5" y="10" width="2" height="4" fill="#7A1FB8"/>
   <rect x="9" y="10" width="2" height="4" fill="#7A1FB8"/>

@@ -19,53 +19,65 @@ function getErrorMessage(body: unknown): string {
   return '';
 }
 
-/** 아트 스타일별 프롬프트 프리픽스 (간결화: ~40자 이내) */
-const ART_STYLE_PREFIX: Record<ArtStyle, string> = {
+/** Art style prompt prefix (concise: ~60 chars) */
+export const ART_STYLE_PREFIX: Record<ArtStyle, string> = {
   GRAPHIC_NOVEL_ILLUSTRATION: 'Graphic novel style, bold ink outlines, dramatic shading.',
   SOFT_DIGITAL_PAINTING: 'Soft digital painting, warm colors, dreamy atmosphere.',
   FLAT_VECTOR_ILLUSTRATION: 'Flat vector illustration, bold shapes, vibrant colors.',
   '3D_ANIMATED_FAMILY_FILM': '3D animated style, Pixar-quality, cinematic lighting.',
 };
 
+const PROMPT_LIMIT = 1024;
+const NO_TEXT_DIRECTIVE = 'No text, no speech bubbles, no writing.';
+
 /**
- * 패널별 개별 이미지 생성 프롬프트를 구성합니다.
- * 캐릭터 일관성을 위해 characterDescriptions를 모든 패널에 공통으로 넣습니다.
+ * Builds a panel image prompt using priority-based budget allocation.
+ *
+ * Tier 1 (required, never trimmed): Art style prefix, Mood, "No text" directive
+ * Tier 2 (high): Panel description (~45%), Character descriptions (~35%)
+ * Tier 3 (medium): Setting, Narrative context
+ * Tier 4 (low, removed first): Previous/Next scene context
  */
-function buildPanelPrompt(
+export function buildPanelPrompt(
   panel: Panel,
   artStyle: ArtStyle,
   characterDescriptions: string,
-  storyContext: string,
-  adjacentPanels?: { prev?: Panel; next?: Panel }
 ): string {
   const stylePrefix = ART_STYLE_PREFIX[artStyle];
+  const moodText = `Mood: ${panel.emotion}.`;
 
+  // ── Tier 1: Reserved budget (never trimmed) ──
+  const tier1Parts = [stylePrefix, moodText, NO_TEXT_DIRECTIVE];
+  const tier1Joined = tier1Parts.join(' ');
+  const tier1Len = tier1Joined.length; // ~120-140 chars
+
+  // Available budget = 1024 - tier1 - space separators (spaces between 3 parts)
+  // ── Tier 2: Panel description + Character descriptions ──
+
+  // ── Assembly: Style → Description → Characters → Mood → NoText ──
   const parts: string[] = [stylePrefix];
+  parts.push(panel.description);
 
-  // 인접 패널 컨텍스트 추가 (최대 ~180자)
-  if (adjacentPanels?.prev) {
-    parts.push(`Previous scene: ${adjacentPanels.prev.description.slice(0, 80)}.`);
-  }
-  if (adjacentPanels?.next) {
-    parts.push(`Next scene: ${adjacentPanels.next.description.slice(0, 80)}.`);
-  }
-
-  parts.push(panel.description.slice(0, 500));
-
+  // Add briefly to avoid duplicate descriptions
   if (characterDescriptions) {
-    const hasAdjacent = adjacentPanels?.prev || adjacentPanels?.next;
-    parts.push(characterDescriptions.slice(0, hasAdjacent ? 200 : 350));
+    parts.push(`Characters: ${characterDescriptions}`);
+  }
+  parts.push(moodText);
+  parts.push(NO_TEXT_DIRECTIVE);
+
+  const prompt = parts.join(' ');
+
+  // Safety guard — should not trigger under normal conditions
+  if (prompt.length > PROMPT_LIMIT) {
+    console.warn(`[buildPanelPrompt] Budget overflow: ${prompt.length}/${PROMPT_LIMIT}, trimming.`);
+    return prompt.slice(0, PROMPT_LIMIT);
   }
 
-  parts.push(`Mood: ${panel.emotion}`);
-  parts.push('No text, no speech bubbles, no writing.');
-
-  const prompt = parts.join(' ').slice(0, 1024);
   return prompt;
 }
 
 /**
- * 단일 만화 페이지를 위한 통합 프롬프트 (기존 방식, 폴백용)
+ * Combined prompt for a single comic page (legacy method, fallback)
  */
 function buildComicPagePrompt(
   panels: Panel[],
@@ -94,28 +106,28 @@ function buildComicPagePrompt(
   return prompt;
 }
 
-/** 강화된 negativeText - 텍스트/말풍선 관련 키워드 대량 추가 */
-const NEGATIVE_TEXT = [
-  // 텍스트 관련
+/** Enhanced negativeText - extensive text/speech bubble related keywords */
+export const NEGATIVE_TEXT = [
+  // Text related
   'text', 'letters', 'words', 'writing', 'captions', 'subtitles', 'titles',
   'typography', 'font', 'handwriting', 'calligraphy', 'alphabet',
-  // 말풍선 관련
+  // Speech bubble related
   'speech bubbles', 'thought bubbles', 'dialogue balloons', 'word balloons',
   'chat bubbles', 'comic bubbles', 'callout', 'speech balloon',
-  // 품질 관련
+  // Quality related
   'watermarks', 'logos', 'signatures', 'blurry', 'low quality', 'distorted',
   'deformed', 'ugly', 'duplicate', 'cropped badly',
-  // 실사 방지 (만화 스타일 유지)
+  // Prevent photorealism (maintain comic style)
   'photorealistic', 'photograph', 'real person', 'screenshot',
 ].join(', ');
 
 /**
- * 패널 하나에 대한 개별 이미지를 생성합니다.
- * 이 방식이 단일 페이지 통합 생성보다 품질이 훨씬 좋습니다.
+ * Generates an individual image for a single panel.
+ * This approach produces much better quality than single-page generation.
  */
 /**
- * 문자열에서 결정론적 해시 시드를 생성합니다.
- * 동일 입력이면 항상 같은 시드를 반환하여 패널 간 스타일 일관성을 유지합니다.
+ * Generates a deterministic hash seed from a string.
+ * Returns the same seed for identical input to maintain style consistency across panels.
  */
 function hashSeed(input: string): number {
   let hash = 0;
@@ -130,11 +142,12 @@ export async function generatePanelImage(
   artStyle: ArtStyle,
   characterDescriptions: string = '',
   storyContext: string = '',
-  adjacentPanels?: { prev?: Panel; next?: Panel }
+  adjacentPanels?: { prev?: Panel; next?: Panel },
+  setting?: string
 ): Promise<Buffer> {
-  const prompt = buildPanelPrompt(panel, artStyle, characterDescriptions, storyContext, adjacentPanels);
+  const prompt = buildPanelPrompt(panel, artStyle, characterDescriptions);
 
-  // characterDescriptions 기반 고정 시드로 패널 간 캐릭터/스타일 일관성 유지
+  // Fixed seed based on characterDescriptions for character/style consistency across panels
   const baseSeed = hashSeed(characterDescriptions + artStyle);
   const requestBody = {
     taskType: 'TEXT_IMAGE',
@@ -173,15 +186,15 @@ export async function generatePanelImage(
 
   const images = responseBody.images;
   if (!images || images.length === 0) {
-    throw new Error(`Nova Canvas가 패널 ${panel.panelId} 이미지를 반환하지 않았습니다`);
+    throw new Error(`Nova Canvas did not return an image for panel ${panel.panelId}`);
   }
 
   return Buffer.from(images[0], 'base64');
 }
 
 /**
- * 단일 만화 페이지 이미지를 생성합니다 (폴백/레거시 방식).
- * 가능하면 generatePanelImage를 패널별로 호출하는 방식을 추천합니다.
+ * Generates a single comic page image (fallback/legacy method).
+ * It is recommended to call generatePanelImage per panel when possible.
  */
 export async function generateSingleComicPage(
   panels: Panel[],
@@ -227,7 +240,7 @@ export async function generateSingleComicPage(
 
   const images = responseBody.images;
   if (!images || images.length === 0) {
-    throw new Error('Nova Canvas가 이미지를 반환하지 않았습니다');
+    throw new Error('Nova Canvas did not return an image');
   }
 
   return Buffer.from(images[0], 'base64');

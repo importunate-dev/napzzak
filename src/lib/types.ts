@@ -12,29 +12,31 @@ export interface Panel {
   panelId: number;
   description: string;
   emotion: 'joy' | 'sadness' | 'surprise' | 'anger' | 'fear' | 'neutral';
-  /** 영어 대사 (프론트 오버레이용) */
+  /** English dialogue (for front-end overlay) */
   dialogue?: string;
-  /** 한국어 대사 (프론트 오버레이용) */
+  /** Korean dialogue (for front-end overlay) */
   dialogueKo?: string;
-  /** 한국어 번역 (레거시 호환) */
+  /** Korean translation (legacy compatibility) */
   translation?: string;
-  /** 영상에서 추출한 실제 대사 원문 */
+  /** Original dialogue extracted from video */
   transcribedDialogue?: string;
-  /** 패널별 개별 이미지 URL (패널별 생성 모드) */
+  /** Individual image URL per panel (panel generation mode) */
   imageUrl?: string;
+  /** This panel's role in the story arc (e.g., 'Setup: A man sits alone at a table, contemplating') */
+  narrativeContext?: string;
 }
 
 export interface StoryJson {
   videoId: string;
   duration: number;
   summary: string;
-  /** 한국어 요약 */
+  /** Korean summary */
   summaryKo?: string;
   climaxIndex: number;
   panels: Panel[];
-  /** 단일 만화 페이지 이미지 URL (레거시 모드) */
+  /** Single comic page image URL (legacy mode) */
   comicPageUrl: string;
-  /** 사용된 모델 목록 */
+  /** List of models used */
   modelsUsed: string[];
   /** @deprecated Use modelsUsed instead */
   novaModelsUsed?: string[];
@@ -42,12 +44,14 @@ export interface StoryJson {
   hasAudioDialogue: boolean;
   artStyle: ArtStyle;
   dialogueLanguage: DialogueLanguage;
-  /** 캐릭터 외모 설명 (이미지 생성 일관성용) */
+  /** Character appearance description (for image generation consistency) */
   characterDescriptions?: string;
-  /** 패널별 개별 이미지 모드 여부 */
+  /** Whether using per-panel image mode */
   isPanelMode?: boolean;
-  /** AWS Transcribe 대사 추출 결과 */
+  /** AWS Transcribe dialogue extraction result */
   transcribeText?: string;
+  /** Original YouTube URL */
+  youtubeUrl?: string;
 }
 
 export type ViewMode = 'panel' | 'page';
@@ -64,6 +68,9 @@ export type JobProgress =
   | 'analyzing_pass1_stepC'
   | 'verifying'
   | 'analyzing_pass2'
+  | 'pass2_planning'
+  | 'pass2_describing'
+  | 'pass2_reviewing'
   | 'generating_comic'
   | 'generating_panels'
   | 'completed';

@@ -1,18 +1,57 @@
+import ytdl from '@distube/ytdl-core';
 import { spawn } from 'child_process';
-import { writeFile, unlink, mkdtemp } from 'fs/promises';
+import { readFile, rm, mkdtemp, access } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { createWriteStream, readFileSync } from 'fs';
+import { pipeline } from 'stream/promises';
 
-const MAX_DURATION_SECONDS = 600; // 10분
+const MAX_DURATION_SECONDS = 600; // 10 min
 const MAX_BUFFER_SIZE = 100 * 1024 * 1024; // 100MB
-const DOWNLOAD_TIMEOUT_MS = 180_000; // 3분
+const DOWNLOAD_TIMEOUT_MS = 180_000; // 3 min
 
-// yt-dlp 실행 파일 경로 (환경변수로 오버라이드 가능)
-const YTDLP_PATH = process.env.YTDLP_PATH || 'yt-dlp';
-
-// ffmpeg-static 경로
+// ffmpeg-static path
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const FFMPEG_PATH: string = process.env.FFMPEG_PATH || require('ffmpeg-static') as string;
+
+// Load YouTube cookies from Netscape cookies.txt if available
+// Place cookies.txt in project root or set YOUTUBE_COOKIES_PATH env var
+const COOKIES_PATH = process.env.YOUTUBE_COOKIES_PATH || join(process.cwd(), 'cookies.txt');
+
+function loadCookies(): ytdl.Cookie[] | undefined {
+  try {
+    const raw = readFileSync(COOKIES_PATH, 'utf-8');
+    const cookies: ytdl.Cookie[] = [];
+    for (const line of raw.split('\n')) {
+      if (line.startsWith('#') || !line.trim()) continue;
+      const parts = line.split('\t');
+      if (parts.length >= 7) {
+        cookies.push({
+          domain: parts[0],
+          httpOnly: parts[1] === 'TRUE',
+          path: parts[2],
+          secure: parts[3] === 'TRUE',
+          expirationDate: parseInt(parts[4], 10),
+          name: parts[5],
+          value: parts[6].trim(),
+        });
+      }
+    }
+    if (cookies.length > 0) {
+      console.log(`[YouTube] Loaded ${cookies.length} cookies from ${COOKIES_PATH}`);
+      return cookies;
+    }
+  } catch {
+    // No cookies file — proceed without authentication
+  }
+  return undefined;
+}
+
+let ytdlAgent: ReturnType<typeof ytdl.createAgent> | undefined;
+const cookies = loadCookies();
+if (cookies) {
+  ytdlAgent = ytdl.createAgent(cookies);
+}
 
 export interface YouTubeVideoInfo {
   title: string;
@@ -20,7 +59,7 @@ export interface YouTubeVideoInfo {
 }
 
 /**
- * YouTube Shorts URL을 일반 watch URL로 변환
+ * Convert YouTube Shorts URL to standard watch URL
  */
 export function normalizeYouTubeUrl(url: string): string {
   const trimmed = url.trim();
@@ -36,45 +75,6 @@ export function validateYouTubeUrl(url: string): boolean {
   return /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|shorts\/)|youtu\.be\/)[\w-]{11}/.test(normalized);
 }
 
-function runYtdlp(args: string[], timeoutMs = DOWNLOAD_TIMEOUT_MS): Promise<{ stdout: Buffer; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    const proc = spawn(YTDLP_PATH, args);
-    const chunks: Buffer[] = [];
-    let stderr = '';
-    let totalSize = 0;
-
-    proc.stdout.on('data', (d: Buffer) => {
-      totalSize += d.length;
-      if (totalSize > MAX_BUFFER_SIZE) {
-        proc.kill();
-        reject(new Error('영상 크기가 100MB를 초과합니다. 더 짧은 영상을 시도해 주세요'));
-        return;
-      }
-      chunks.push(d);
-    });
-    proc.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
-
-    const timer = setTimeout(() => {
-      proc.kill();
-      reject(new Error(`yt-dlp 타임아웃 (${timeoutMs / 1000}초)`));
-    }, timeoutMs);
-
-    proc.on('close', (code) => {
-      clearTimeout(timer);
-      if (code === 0) {
-        resolve({ stdout: Buffer.concat(chunks), stderr });
-      } else {
-        reject(new Error(`yt-dlp 실패 (exit ${code}): ${stderr.slice(-500)}`));
-      }
-    });
-
-    proc.on('error', (err) => {
-      clearTimeout(timer);
-      reject(new Error(`yt-dlp 실행 오류: ${err.message}`));
-    });
-  });
-}
-
 function runFfmpeg(args: string[], timeoutMs = 60_000): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const proc = spawn(FFMPEG_PATH, args);
@@ -86,7 +86,7 @@ function runFfmpeg(args: string[], timeoutMs = 60_000): Promise<Buffer> {
 
     const timer = setTimeout(() => {
       proc.kill();
-      reject(new Error(`ffmpeg 타임아웃 (${timeoutMs / 1000}초)`));
+      reject(new Error(`ffmpeg timeout (${timeoutMs / 1000}s)`));
     }, timeoutMs);
 
     proc.on('close', (code) => {
@@ -94,97 +94,83 @@ function runFfmpeg(args: string[], timeoutMs = 60_000): Promise<Buffer> {
       if (code === 0) {
         resolve(Buffer.concat(chunks));
       } else {
-        reject(new Error(`ffmpeg 실패 (exit ${code}): ${stderr.slice(-500)}`));
+        reject(new Error(`ffmpeg failed (exit ${code}): ${stderr.slice(-500)}`));
       }
     });
 
     proc.on('error', (err) => {
       clearTimeout(timer);
-      reject(new Error(`ffmpeg 실행 오류: ${err.message}`));
+      reject(new Error(`ffmpeg execution error: ${err.message}`));
     });
   });
 }
 
 export async function getVideoInfo(url: string): Promise<YouTubeVideoInfo> {
   const normalized = normalizeYouTubeUrl(url);
-  const { stdout } = await runYtdlp([
-    '--print', '%(title)s\n%(duration)s',
-    '--no-playlist',
-    normalized,
-  ], 30_000);
-  const lines = stdout.toString().trim().split('\n');
-  const title = lines[0] || 'untitled';
-  const duration = parseInt(lines[1] || '0', 10);
+  const opts = ytdlAgent ? { agent: ytdlAgent } : {};
+  const info = await ytdl.getInfo(normalized, opts);
+  const title = info.videoDetails.title || 'untitled';
+  const duration = parseInt(info.videoDetails.lengthSeconds || '0', 10);
   return { title, duration };
 }
 
 export async function downloadYouTube(url: string): Promise<{ buffer: Buffer; title: string }> {
   if (!validateYouTubeUrl(url)) {
-    throw new Error('유효하지 않은 YouTube URL입니다');
+    throw new Error('Invalid YouTube URL');
   }
 
   const normalized = normalizeYouTubeUrl(url);
   const info = await getVideoInfo(url);
 
   if (info.duration > MAX_DURATION_SECONDS) {
-    throw new Error(`10분 이하 영상만 지원합니다 (현재: ${Math.ceil(info.duration / 60)}분)`);
+    throw new Error(`Only videos under 10 minutes are supported (current: ${Math.ceil(info.duration / 60)} min)`);
   }
 
-  console.log(`[YouTube] 다운로드 시작: "${info.title}" (${info.duration}초)`);
+  console.log(`[YouTube] Download started: "${info.title}" (${info.duration}s)`);
 
-  // 임시 디렉토리에 다운로드
   const tmpDir = await mkdtemp(join(tmpdir(), 'napzzak-'));
-  const rawPath = join(tmpDir, 'raw.%(ext)s');
+  const rawPath = join(tmpDir, 'raw.mp4');
   const outPath = join(tmpDir, 'output.mp4');
 
   try {
-    // 1단계: yt-dlp로 파일 다운로드
-    await runYtdlp([
-      '-f', 'bestvideo[vcodec^=avc][ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
-      '--ffmpeg-location', FFMPEG_PATH,
-      '--merge-output-format', 'mp4',
-      '-o', rawPath,
-      '--no-playlist',
-      normalized,
-    ]);
+    // Step 1: Download with ytdl-core (video+audio combined format preferred)
+    const stream = ytdl(normalized, {
+      filter: 'audioandvideo',
+      quality: 'highest',
+      ...(ytdlAgent ? { agent: ytdlAgent } : {}),
+    });
 
-    // yt-dlp가 실제로 쓴 파일 경로 확인
-    const { stdout: realPathBuf } = await runYtdlp([
-      '-f', 'bestvideo[vcodec^=avc][ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
-      '--get-filename',
-      '-o', rawPath,
-      '--no-playlist',
-      normalized,
-    ], 30_000);
-    const downloadedPath = realPathBuf.toString().trim();
+    // Timeout guard
+    const downloadPromise = pipeline(stream, createWriteStream(rawPath));
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Download timeout (${DOWNLOAD_TIMEOUT_MS / 1000}s)`)), DOWNLOAD_TIMEOUT_MS)
+    );
 
-    // 2단계: ffmpeg으로 Bedrock 호환 MP4로 리인코딩
-    // -c:v copy 로 비디오 재인코딩 없이 컨테이너만 정리 (빠름)
+    await Promise.race([downloadPromise, timeoutPromise]);
+
+    // Step 2: Re-encode to Bedrock-compatible MP4 with ffmpeg
     await runFfmpeg([
       '-y',
-      '-i', downloadedPath,
+      '-i', rawPath,
       '-c:v', 'copy',
       '-c:a', 'aac',
       '-movflags', '+faststart',
       outPath,
     ], 120_000);
 
-    // 3단계: 파일 읽기
-    const { readFile } = await import('fs/promises');
+    // Step 3: Read file
     const buffer = await readFile(outPath);
 
     if (buffer.length === 0) {
-      throw new Error('변환된 영상이 비어있습니다');
+      throw new Error('Converted video is empty');
     }
     if (buffer.length > MAX_BUFFER_SIZE) {
-      throw new Error('영상 크기가 100MB를 초과합니다. 더 짧은 영상을 시도해 주세요');
+      throw new Error('Video size exceeds 100MB. Please try a shorter video');
     }
 
-    console.log(`[YouTube] 다운로드 완료: ${(buffer.length / 1024 / 1024).toFixed(1)}MB`);
+    console.log(`[YouTube] Download complete: ${(buffer.length / 1024 / 1024).toFixed(1)}MB`);
     return { buffer, title: info.title };
   } finally {
-    // 임시 파일 정리
-    const { rm } = await import('fs/promises');
     await rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   }
 }

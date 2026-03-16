@@ -7,7 +7,7 @@ import {
   stepD_ContradictionResolution,
   validatePass1Quality,
   verifyAnalysis,
-  extractPanelStructure,
+  extractPanelStructureMultiAgent,
   type VideoDeepAnalysis,
   type NovaAnalysisResult,
 } from '@/lib/bedrock';
@@ -16,86 +16,37 @@ import { downloadYouTube, validateYouTubeUrl, normalizeYouTubeUrl } from '@/lib/
 import { transcribeFromVideo, type TranscribeResult } from '@/lib/transcribe';
 import { extractKeyframes } from '@/lib/pipeline';
 import { getBufferDuration } from '@/lib/ffmpeg';
-import { generatePanelImage } from '@/lib/canvas';
+import { generatePanelImage, buildPanelPrompt, NEGATIVE_TEXT } from '@/lib/canvas';
 import type { ArtStyle, Panel } from '@/lib/types';
 
 export const maxDuration = 300;
-
-const ART_STYLE_PREFIX: Record<ArtStyle, string> = {
-  GRAPHIC_NOVEL_ILLUSTRATION: 'Graphic novel style, bold ink outlines, dramatic shading.',
-  SOFT_DIGITAL_PAINTING: 'Soft digital painting, warm colors, dreamy atmosphere.',
-  FLAT_VECTOR_ILLUSTRATION: 'Flat vector illustration, bold shapes, vibrant colors.',
-  '3D_ANIMATED_FAMILY_FILM': '3D animated style, Pixar-quality, cinematic lighting.',
-};
-
-const NEGATIVE_TEXT = [
-  'text', 'letters', 'words', 'writing', 'captions', 'subtitles', 'titles',
-  'typography', 'font', 'handwriting', 'calligraphy', 'alphabet',
-  'speech bubbles', 'thought bubbles', 'dialogue balloons', 'word balloons',
-  'chat bubbles', 'comic bubbles', 'callout', 'speech balloon',
-  'watermarks', 'logos', 'signatures', 'blurry', 'low quality', 'distorted',
-  'deformed', 'ugly', 'duplicate', 'cropped badly',
-  'photorealistic', 'photograph', 'real person', 'screenshot',
-].join(', ');
-
-function buildPanelPrompt(
-  panel: Panel,
-  artStyle: ArtStyle,
-  characterDescriptions: string,
-  _storyContext: string,
-  adjacentPanels?: { prev?: Panel; next?: Panel }
-): string {
-  const stylePrefix = ART_STYLE_PREFIX[artStyle];
-
-  const parts: string[] = [stylePrefix];
-
-  // 인접 패널 컨텍스트 추가
-  if (adjacentPanels?.prev) {
-    parts.push(`Previous scene: ${adjacentPanels.prev.description.slice(0, 80)}.`);
-  }
-  if (adjacentPanels?.next) {
-    parts.push(`Next scene: ${adjacentPanels.next.description.slice(0, 80)}.`);
-  }
-
-  parts.push(panel.description.slice(0, 400));
-
-  if (characterDescriptions) {
-    const hasAdjacent = adjacentPanels?.prev || adjacentPanels?.next;
-    parts.push(characterDescriptions.slice(0, hasAdjacent ? 200 : 500));
-  }
-
-  parts.push(`Mood: ${panel.emotion}.`);
-  parts.push('No text, no speech bubbles, no writing.');
-
-  return parts.join(' ').slice(0, 1024);
-}
 
 export async function POST(request: NextRequest) {
   let body: { url?: string };
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: '잘못된 요청 형식입니다' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid request format' }, { status: 400 });
   }
 
   const { url } = body;
 
   if (!url || typeof url !== 'string') {
-    return NextResponse.json({ error: 'YouTube URL이 필요합니다' }, { status: 400 });
+    return NextResponse.json({ error: 'YouTube URL is required' }, { status: 400 });
   }
 
   const normalizedUrl = normalizeYouTubeUrl(url);
   if (!validateYouTubeUrl(url)) {
-    return NextResponse.json({ error: '유효하지 않은 YouTube URL입니다' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 });
   }
 
   try {
-    // 1. YouTube 다운로드
-    console.log(`[analyze-story] YouTube 다운로드 시작: ${normalizedUrl}`);
+    // 1. YouTube download
+    console.log(`[analyze-story] YouTube download started: ${normalizedUrl}`);
     const { buffer, title } = await downloadYouTube(normalizedUrl);
-    console.log(`[analyze-story] 다운로드 완료: "${title}" (${(buffer.length / 1024 / 1024).toFixed(1)}MB)`);
+    console.log(`[analyze-story] Download complete: "${title}" (${(buffer.length / 1024 / 1024).toFixed(1)}MB)`);
 
-    // 2. S3 업로드
+    // 2. S3 upload
     const tempId = uuidv4();
     const videoKey = `temp/${tempId}/original.mp4`;
     const s3Uri = await uploadToS3(videoKey, buffer, 'video/mp4');
@@ -105,7 +56,7 @@ export async function POST(request: NextRequest) {
     let transcribeResult: TranscribeResult | null = null;
     let transcriptText: string | undefined;
     try {
-      console.log(`[analyze-story] Transcribe 시작...`);
+      console.log(`[analyze-story] Starting Transcribe...`);
       transcribeResult = await transcribeFromVideo(buffer, tempId);
       if (transcribeResult.fullText.trim().length > 0) {
         transcriptText = transcribeResult.segments
@@ -115,77 +66,77 @@ export async function POST(request: NextRequest) {
             return `${time} ${speaker} ${s.text}`;
           })
           .join('\n');
-        console.log(`[analyze-story] Transcribe 완료: ${transcribeResult.segments.length}개 세그먼트`);
+        console.log(`[analyze-story] Transcribe complete: ${transcribeResult.segments.length} segments`);
       } else {
-        console.log(`[analyze-story] Transcribe: 대사 없음`);
+        console.log(`[analyze-story] Transcribe: No dialogue found`);
       }
     } catch (err) {
-      console.warn(`[analyze-story] Transcribe 실패 (계속 진행):`, err);
+      console.warn(`[analyze-story] Transcribe failed (continuing):`, err);
     }
 
-    // 4. ffprobe로 정확한 duration 추출 + 키프레임 추출
+    // 4. Extract accurate duration with ffprobe + keyframe extraction
     let videoDuration: number | undefined;
     try {
       videoDuration = await getBufferDuration(buffer);
-      console.log(`[analyze-story] 영상 길이: ${videoDuration}s`);
+      console.log(`[analyze-story] Video duration: ${videoDuration}s`);
     } catch (err) {
-      console.warn(`[analyze-story] duration 추출 실패 (30s 기본값 사용):`, err);
+      console.warn(`[analyze-story] Duration extraction failed (using 30s default):`, err);
     }
 
     let frameImages: string[] | undefined;
     try {
       frameImages = await extractKeyframes(buffer, videoDuration ?? 30);
-      console.log(`[analyze-story] 키프레임 ${frameImages.length}장 추출`);
+      console.log(`[analyze-story] ${frameImages.length} keyframes extracted`);
     } catch (err) {
-      console.warn(`[analyze-story] 키프레임 추출 실패:`, err);
+      console.warn(`[analyze-story] Keyframe extraction failed:`, err);
     }
 
-    // 5+6. Step A + B: 병렬 분석
-    console.log(`[analyze-story] Step A + B 병렬 시작...`);
+    // 5+6. Step A + B: Parallel analysis
+    console.log(`[analyze-story] Step A + B parallel start...`);
     const [stepAResult, stepBResult] = await Promise.all([
       stepA_DialogueVerification(s3Uri, bucketOwner, transcriptText, frameImages, videoDuration),
       stepB_ActionSequenceAnalysis(s3Uri, bucketOwner, transcriptText, frameImages, videoDuration),
     ]);
 
-    // Step D: 모순 해결 (Debate Agent)
-    console.log(`[analyze-story] Step D (Debate) 시작...`);
+    // Step D: Contradiction resolution (Debate Agent)
+    console.log(`[analyze-story] Step D (Debate) starting...`);
     const debateResult = await stepD_ContradictionResolution(stepAResult, stepBResult, videoDuration);
 
-    // 7. Step C: 종합 분석
-    console.log(`[analyze-story] Step C 시작...`);
+    // 7. Step C: Synthesis analysis
+    console.log(`[analyze-story] Step C starting...`);
     let stepCResult: VideoDeepAnalysis = await stepC_Synthesis(s3Uri, bucketOwner, stepAResult, stepBResult, transcriptText, videoDuration, debateResult);
 
-    // ffprobe 측정값으로 duration 덮어쓰기 (AI hallucination 방지)
+    // Override duration with ffprobe measurement (prevent AI hallucination)
     if (videoDuration !== undefined) {
       stepCResult.duration = videoDuration;
     }
 
-    // 8. 품질 검증
+    // 8. Quality validation
     const qualityCheck = validatePass1Quality(stepCResult);
-    console.log(`[analyze-story] 품질 검증: ${qualityCheck.valid ? 'PASS' : 'FAIL'} — ${qualityCheck.reason}`);
+    console.log(`[analyze-story] Quality check: ${qualityCheck.valid ? 'PASS' : 'FAIL'} — ${qualityCheck.reason}`);
     if (!qualityCheck.valid) {
-      console.warn(`[analyze-story] 품질 불합격, 재시도...`);
+      console.warn(`[analyze-story] Quality check failed, retrying...`);
       stepCResult = await stepC_Synthesis(s3Uri, bucketOwner, stepAResult, stepBResult, transcriptText, videoDuration, debateResult);
       if (videoDuration !== undefined) {
         stepCResult.duration = videoDuration;
       }
     }
 
-    // 9. 반박 검증
-    console.log(`[analyze-story] 반박 검증 시작...`);
+    // 9. Challenge verification
+    console.log(`[analyze-story] Starting challenge verification...`);
     const verifiedResult: VideoDeepAnalysis = await verifyAnalysis(s3Uri, bucketOwner, stepCResult);
 
-    // ffprobe 측정값으로 duration 덮어쓰기 (검증 후에도 적용)
+    // Override duration with ffprobe measurement (applied after verification too)
     if (videoDuration !== undefined) {
       verifiedResult.duration = videoDuration;
     }
 
-    // 10. Pass 2: 패널 구조 추출
-    console.log(`[analyze-story] Pass 2 시작...`);
-    const pass2Result: NovaAnalysisResult = await extractPanelStructure(s3Uri, bucketOwner, verifiedResult);
+    // 10. Pass 2: Multi-agent panel structure extraction
+    console.log(`[analyze-story] Pass 2 (multi-agent) starting...`);
+    const pass2Result: NovaAnalysisResult = await extractPanelStructureMultiAgent(s3Uri, bucketOwner, verifiedResult);
 
-    // 11. 이미지 생성
-    console.log(`[analyze-story] 이미지 생성 시작 (${pass2Result.panels.length}개 패널)...`);
+    // 11. Image generation
+    console.log(`[analyze-story] Image generation started (${pass2Result.panels.length} panels)...`);
     const artStyle: ArtStyle = 'GRAPHIC_NOVEL_ILLUSTRATION';
     const imagePrompts: Array<{ panelId: number; prompt: string; negativeText: string }> = [];
     const panelsWithImages: Array<{
@@ -203,6 +154,7 @@ export async function POST(request: NextRequest) {
       emotion: p.emotion as Panel['emotion'],
       dialogue: p.dialogue || undefined,
       dialogueKo: p.dialogueKo || undefined,
+      narrativeContext: p.narrativeContext || undefined,
     }));
 
     for (let i = 0; i < allPanels.length; i++) {
@@ -213,7 +165,7 @@ export async function POST(request: NextRequest) {
         next: i < allPanels.length - 1 ? allPanels[i + 1] : undefined,
       };
 
-      const prompt = buildPanelPrompt(panel, artStyle, pass2Result.characterDescriptions || '', pass2Result.summary, adjacent);
+      const prompt = buildPanelPrompt(panel, artStyle, pass2Result.characterDescriptions || '');
       imagePrompts.push({
         panelId: p.panelId,
         prompt,
@@ -227,13 +179,14 @@ export async function POST(request: NextRequest) {
           artStyle,
           pass2Result.characterDescriptions || '',
           pass2Result.summary,
-          adjacent
+          adjacent,
+          pass2Result.setting
         );
         const imageKey = `temp/${tempId}/debug-panel-${p.panelId}.png`;
         imageUrl = await uploadImageAndGetUrl(imageKey, imageBuffer);
-        console.log(`[analyze-story] 패널 ${p.panelId} 이미지 생성 완료`);
+        console.log(`[analyze-story] Panel ${p.panelId} image generation complete`);
       } catch (err) {
-        console.error(`[analyze-story] 패널 ${p.panelId} 이미지 생성 실패:`, err);
+        console.error(`[analyze-story] Panel ${p.panelId} image generation failed:`, err);
       }
 
       panelsWithImages.push({
@@ -246,7 +199,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    console.log(`[analyze-story] 풀 파이프라인 완료`);
+    console.log(`[analyze-story] Full pipeline complete`);
 
     return NextResponse.json({
       title,
@@ -269,7 +222,7 @@ export async function POST(request: NextRequest) {
       panels: panelsWithImages,
     });
   } catch (err) {
-    console.error(`[analyze-story] 오류:`, err);
+    console.error(`[analyze-story] Error:`, err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : String(err) },
       { status: 500 }

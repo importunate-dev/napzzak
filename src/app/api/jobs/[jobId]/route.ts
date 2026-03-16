@@ -32,7 +32,7 @@ export async function GET(
     });
   }
 
-  return NextResponse.json({ error: '작업을 찾을 수 없습니다' }, { status: 404 });
+  return NextResponse.json({ error: 'Job not found' }, { status: 404 });
 }
 
 export async function DELETE(
@@ -44,11 +44,11 @@ export async function DELETE(
 
   if (!cancelled) {
     return NextResponse.json(
-      { error: '취소할 수 없는 작업입니다' },
+      { error: 'This job cannot be cancelled' },
       { status: 400 }
     );
   }
 
-  console.log(`[Job ${jobId}] 사용자가 작업 취소 요청`);
+  console.log(`[Job ${jobId}] User requested job cancellation`);
   return NextResponse.json({ status: 'cancelled' });
 }

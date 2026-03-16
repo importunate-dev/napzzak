@@ -1,9 +1,9 @@
 'use client';
 
-// 납짝 마스코트: 보라색 픽셀 문어 (납서) + 너구리 기사 (짝이)
-// 픽셀 아트 스타일, img/ 폴더의 레퍼런스 기반
+// Napzzak mascots: Purple pixel octopus (Napseo) + Raccoon knight (Zzagi)
+// Pixel art style, based on references in img/ folder
 
-/** 보라색 픽셀 문어 마스코트 */
+/** Purple pixel octopus mascot */
 export function OctopusMascot({ size = 48, className = '' }: { size?: number; className?: string }) {
   return (
     <svg
@@ -14,33 +14,33 @@ export function OctopusMascot({ size = 48, className = '' }: { size?: number; cl
       className={className}
       style={{ imageRendering: 'pixelated' }}
     >
-      {/* 머리 */}
+      {/* Head */}
       <rect x="4" y="1" width="8" height="7" fill="#8B2FC9" />
       <rect x="3" y="2" width="10" height="5" fill="#8B2FC9" />
-      {/* 눈 흰자 */}
+      {/* Eye whites */}
       <rect x="5" y="3" width="2" height="2" fill="#000" />
       <rect x="9" y="3" width="2" height="2" fill="#000" />
-      {/* 눈 빛 */}
+      {/* Eye highlights */}
       <rect x="5" y="3" width="1" height="1" fill="#fff" />
       <rect x="9" y="3" width="1" height="1" fill="#fff" />
-      {/* 입 */}
+      {/* Mouth */}
       <rect x="7" y="6" width="1" height="1" fill="#000" />
       <rect x="8" y="5" width="1" height="1" fill="#000" />
-      {/* 몸통 */}
+      {/* Body */}
       <rect x="4" y="8" width="8" height="3" fill="#8B2FC9" />
-      {/* 다리 1 */}
+      {/* Leg 1 */}
       <rect x="2" y="9" width="2" height="4" fill="#7A1FB8" />
       <rect x="2" y="13" width="2" height="1" fill="#6A15A0" />
-      {/* 다리 2 */}
+      {/* Leg 2 */}
       <rect x="5" y="10" width="2" height="4" fill="#7A1FB8" />
       <rect x="5" y="14" width="2" height="1" fill="#6A15A0" />
-      {/* 다리 3 */}
+      {/* Leg 3 */}
       <rect x="9" y="10" width="2" height="4" fill="#7A1FB8" />
       <rect x="9" y="14" width="2" height="1" fill="#6A15A0" />
-      {/* 다리 4 */}
+      {/* Leg 4 */}
       <rect x="12" y="9" width="2" height="4" fill="#7A1FB8" />
       <rect x="12" y="13" width="2" height="1" fill="#6A15A0" />
-      {/* 외곽선 강조 */}
+      {/* Outline emphasis */}
       <rect x="3" y="1" width="10" height="1" fill="#000" />
       <rect x="2" y="2" width="1" height="5" fill="#000" />
       <rect x="13" y="2" width="1" height="5" fill="#000" />
@@ -48,7 +48,7 @@ export function OctopusMascot({ size = 48, className = '' }: { size?: number; cl
   );
 }
 
-/** 너구리 기사 마스코트 (납짝 전) */
+/** Raccoon knight mascot (before Napzzak) */
 export function RaccoonMascot({ size = 48, className = '' }: { size?: number; className?: string }) {
   return (
     <svg
@@ -59,40 +59,40 @@ export function RaccoonMascot({ size = 48, className = '' }: { size?: number; cl
       className={className}
       style={{ imageRendering: 'pixelated' }}
     >
-      {/* 투구 */}
+      {/* Helmet */}
       <rect x="4" y="0" width="8" height="4" fill="#888" />
       <rect x="3" y="1" width="10" height="3" fill="#999" />
       <rect x="5" y="0" width="6" height="1" fill="#aaa" />
-      {/* 황금 장식 */}
+      {/* Gold decoration */}
       <rect x="6" y="1" width="4" height="1" fill="#F5A623" />
-      {/* 너구리 얼굴 */}
+      {/* Raccoon face */}
       <rect x="3" y="4" width="10" height="6" fill="#C8A882" />
-      {/* 눈 마스크 (너구리 특징) */}
+      {/* Eye mask (raccoon feature) */}
       <rect x="3" y="5" width="4" height="3" fill="#555" />
       <rect x="9" y="5" width="4" height="3" fill="#555" />
-      {/* 눈 */}
+      {/* Eyes */}
       <rect x="4" y="6" width="2" height="1" fill="#fff" />
       <rect x="10" y="6" width="2" height="1" fill="#fff" />
       <rect x="5" y="6" width="1" height="1" fill="#4A90E2" />
       <rect x="10" y="6" width="1" height="1" fill="#4A90E2" />
-      {/* 코 */}
+      {/* Nose */}
       <rect x="7" y="8" width="2" height="1" fill="#333" />
-      {/* 입 */}
+      {/* Mouth */}
       <rect x="6" y="9" width="4" height="1" fill="#C8A882" />
       <rect x="6" y="9" width="1" height="1" fill="#999" />
       <rect x="9" y="9" width="1" height="1" fill="#999" />
-      {/* 몸통 (파란 갑옷) */}
+      {/* Body (blue armor) */}
       <rect x="3" y="10" width="10" height="5" fill="#4A90E2" />
       <rect x="4" y="11" width="8" height="3" fill="#357ABD" />
-      {/* 빨간 스카프 */}
+      {/* Red scarf */}
       <rect x="3" y="10" width="10" height="2" fill="#D0021B" />
-      {/* 팔 */}
+      {/* Arms */}
       <rect x="1" y="10" width="2" height="4" fill="#C8A882" />
       <rect x="13" y="10" width="2" height="4" fill="#C8A882" />
-      {/* 다리 */}
+      {/* Legs */}
       <rect x="4" y="15" width="3" height="4" fill="#8B6914" />
       <rect x="9" y="15" width="3" height="4" fill="#8B6914" />
-      {/* 꼬리 줄무늬 (너구리 특징) */}
+      {/* Tail stripes (raccoon feature) */}
       <rect x="1" y="14" width="1" height="3" fill="#888" />
       <rect x="1" y="15" width="1" height="1" fill="#444" />
       <rect x="1" y="17" width="1" height="1" fill="#444" />
@@ -100,7 +100,7 @@ export function RaccoonMascot({ size = 48, className = '' }: { size?: number; cl
   );
 }
 
-/** 납짝된 너구리 마스코트 */
+/** Flattened raccoon mascot */
 export function RaccoonFlatMascot({ size = 48, className = '' }: { size?: number; className?: string }) {
   return (
     <svg
@@ -111,23 +111,23 @@ export function RaccoonFlatMascot({ size = 48, className = '' }: { size?: number
       className={className}
       style={{ imageRendering: 'pixelated' }}
     >
-      {/* 납짝한 너구리 몸통 */}
+      {/* Flattened raccoon body */}
       <rect x="1" y="3" width="18" height="3" fill="#C8A882" />
       <rect x="0" y="4" width="20" height="2" fill="#B8976E" />
-      {/* 납짝한 머리 */}
+      {/* Flattened head */}
       <rect x="5" y="2" width="10" height="2" fill="#C8A882" />
-      {/* 눈이 빙글빙글 (x 눈) */}
+      {/* Dizzy eyes (x eyes) */}
       <rect x="6" y="2" width="1" height="1" fill="#333" />
       <rect x="7" y="3" width="1" height="1" fill="#333" />
       <rect x="12" y="2" width="1" height="1" fill="#333" />
       <rect x="11" y="3" width="1" height="1" fill="#333" />
-      {/* 혀 */}
+      {/* Tongue */}
       <rect x="9" y="4" width="2" height="1" fill="#FF6B6B" />
-      {/* 납짝한 갑옷 */}
+      {/* Flattened armor */}
       <rect x="2" y="4" width="16" height="2" fill="#4A90E2" />
-      {/* 빨간 스카프 납짝 */}
+      {/* Flattened red scarf */}
       <rect x="3" y="3" width="14" height="1" fill="#D0021B" />
-      {/* 별 효과 */}
+      {/* Star effects */}
       <rect x="0" y="1" width="1" height="1" fill="#F5A623" />
       <rect x="2" y="0" width="1" height="1" fill="#F5A623" />
       <rect x="17" y="0" width="1" height="1" fill="#F5A623" />
@@ -136,7 +136,7 @@ export function RaccoonFlatMascot({ size = 48, className = '' }: { size?: number
   );
 }
 
-/** 문어가 망치를 들고 있는 모습 */
+/** Octopus holding a hammer */
 export function OctopusWithHammer({ size = 56, className = '' }: { size?: number; className?: string }) {
   return (
     <svg
@@ -147,31 +147,31 @@ export function OctopusWithHammer({ size = 56, className = '' }: { size?: number
       className={className}
       style={{ imageRendering: 'pixelated' }}
     >
-      {/* 망치 자루 */}
+      {/* Hammer handle */}
       <rect x="14" y="4" width="1" height="8" fill="#8B6914" />
-      {/* 망치 머리 */}
+      {/* Hammer head */}
       <rect x="12" y="2" width="5" height="3" fill="#888" />
       <rect x="13" y="1" width="3" height="1" fill="#aaa" />
-      {/* 문어 머리 */}
+      {/* Octopus head */}
       <rect x="4" y="5" width="8" height="7" fill="#8B2FC9" />
       <rect x="3" y="6" width="10" height="5" fill="#8B2FC9" />
-      {/* 눈 */}
+      {/* Eyes */}
       <rect x="5" y="7" width="2" height="2" fill="#000" />
       <rect x="9" y="7" width="2" height="2" fill="#000" />
       <rect x="5" y="7" width="1" height="1" fill="#fff" />
       <rect x="9" y="7" width="1" height="1" fill="#fff" />
-      {/* 입 (웃는) */}
+      {/* Mouth (smiling) */}
       <rect x="6" y="10" width="4" height="1" fill="#000" />
       <rect x="5" y="9" width="1" height="1" fill="#000" />
       <rect x="10" y="9" width="1" height="1" fill="#000" />
-      {/* 몸통 */}
+      {/* Body */}
       <rect x="4" y="12" width="8" height="3" fill="#8B2FC9" />
-      {/* 다리 */}
+      {/* Legs */}
       <rect x="2" y="13" width="2" height="4" fill="#7A1FB8" />
       <rect x="5" y="14" width="2" height="4" fill="#7A1FB8" />
       <rect x="9" y="14" width="2" height="4" fill="#7A1FB8" />
       <rect x="13" y="13" width="2" height="3" fill="#7A1FB8" />
-      {/* 팔 (망치 들기) */}
+      {/* Arm (holding hammer) */}
       <rect x="12" y="9" width="3" height="3" fill="#8B2FC9" />
     </svg>
   );

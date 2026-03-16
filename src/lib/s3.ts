@@ -51,7 +51,7 @@ export async function downloadFromS3(key: string): Promise<Buffer> {
     Key: key,
   }));
   const bytes = await response.Body?.transformToByteArray();
-  if (!bytes) throw new Error(`S3에서 ${key}를 다운로드할 수 없습니다`);
+  if (!bytes) throw new Error(`Cannot download ${key} from S3`);
   return Buffer.from(bytes);
 }
 

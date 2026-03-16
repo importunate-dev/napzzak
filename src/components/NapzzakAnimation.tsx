@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 
 export type Scene = 'smash' | 'dance' | 'run' | 'search' | 'paint';
 
-// 공통 문어 SVG
+// Common octopus SVG
 function OctopusSVG() {
   return (
     <svg width="52" height="52" viewBox="0 0 16 16" style={{ imageRendering: 'pixelated' }}>
@@ -30,7 +30,7 @@ function OctopusSVG() {
   );
 }
 
-// 공통 너구리 SVG
+// Common raccoon SVG
 function RaccoonSVG() {
   return (
     <svg width="68" height="68" viewBox="0 0 16 20" style={{ imageRendering: 'pixelated' }}>
@@ -56,7 +56,7 @@ function RaccoonSVG() {
   );
 }
 
-// 장면 1: 납짝 (망치)
+// Scene 1: Napzzak (hammer)
 export function SmashScene() {
   return (
     <>
@@ -123,7 +123,7 @@ export function SmashScene() {
             textShadow: '2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000',
             letterSpacing: 1,
           }}>
-            납짝!
+            SQUISH!
           </span>
         </div>
 
@@ -152,7 +152,7 @@ export function SmashScene() {
   );
 }
 
-// 장면 2: 춤추기
+// Scene 2: Dancing
 export function DanceScene() {
   return (
     <>
@@ -200,7 +200,7 @@ export function DanceScene() {
   );
 }
 
-// 장면 3: 달리기
+// Scene 3: Running
 export function RunScene() {
   return (
     <>
@@ -236,7 +236,7 @@ export function RunScene() {
       `}</style>
 
       <div className="relative flex items-end justify-center gap-2" style={{ height: 100, width: 180 }}>
-        {/* 속도선 */}
+        {/* Speed lines */}
         <div className="speed-lines absolute" style={{ left: 4, top: 30 }}>
           <svg width="24" height="40" viewBox="0 0 12 20" style={{ imageRendering: 'pixelated' }}>
             <rect x="0" y="2" width="8" height="1" fill="#666" />
@@ -247,7 +247,7 @@ export function RunScene() {
           </svg>
         </div>
 
-        {/* 먼지 */}
+        {/* Dust */}
         <div className="dust-1 absolute" style={{ bottom: 8, left: 20 }}>
           <svg width="12" height="12" viewBox="0 0 6 6" style={{ imageRendering: 'pixelated' }}>
             <rect x="1" y="1" width="2" height="2" fill="#888" opacity="0.6" />
@@ -276,7 +276,7 @@ export function RunScene() {
   );
 }
 
-// 장면 4: 검색/분석 (돋보기로 살펴보기)
+// Scene 4: Search/Analysis (examining with magnifying glass)
 export function SearchScene() {
   return (
     <>
@@ -303,7 +303,7 @@ export function SearchScene() {
       `}</style>
 
       <div className="relative flex items-end justify-center gap-4" style={{ height: 100, width: 180 }}>
-        {/* 생각 말풍선 점 */}
+        {/* Thinking bubble dots */}
         <div className="absolute" style={{ top: 4, right: 30 }}>
           <span className="think-dot-1" style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#F5A623', marginRight: 3 }} />
           <span className="think-dot-2" style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#8B2FC9', marginRight: 3 }} />
@@ -311,7 +311,7 @@ export function SearchScene() {
         </div>
 
         <div className="search-octopus flex flex-col items-center" style={{ marginBottom: 8 }}>
-          {/* 돋보기 */}
+          {/* Magnifying glass */}
           <div className="search-glass" style={{ marginBottom: -4 }}>
             <svg width="28" height="28" viewBox="0 0 10 10" style={{ imageRendering: 'pixelated' }}>
               <rect x="2" y="1" width="4" height="1" fill="#F5A623" />
@@ -335,7 +335,7 @@ export function SearchScene() {
   );
 }
 
-// 장면 5: 그리기/페인팅 (붓으로 그리기)
+// Scene 5: Drawing/Painting (painting with brush)
 export function PaintScene() {
   return (
     <>
@@ -369,7 +369,7 @@ export function PaintScene() {
       `}</style>
 
       <div className="relative flex items-end justify-center gap-2" style={{ height: 100, width: 180 }}>
-        {/* 페인트 스플래시 */}
+        {/* Paint splashes */}
         <div className="paint-splash-1 absolute" style={{ top: 12, left: 60 }}>
           <svg width="16" height="16" viewBox="0 0 8 8" style={{ imageRendering: 'pixelated' }}>
             <rect x="2" y="2" width="4" height="4" fill="#FF6B6B" />
@@ -386,7 +386,7 @@ export function PaintScene() {
         </div>
 
         <div className="paint-octopus flex flex-col items-center" style={{ marginBottom: 8 }}>
-          {/* 붓 */}
+          {/* Brush */}
           <div style={{ marginBottom: -2 }}>
             <svg width="24" height="28" viewBox="0 0 8 10" style={{ imageRendering: 'pixelated' }}>
               <rect x="3" y="0" width="2" height="3" fill="#FF6B6B" />
@@ -399,7 +399,7 @@ export function PaintScene() {
           <OctopusSVG />
         </div>
 
-        {/* 캔버스를 들고 있는 너구리 */}
+        {/* Raccoon holding canvas */}
         <div className="paint-raccoon flex flex-col items-center">
           <div style={{ marginBottom: -2 }}>
             <svg width="32" height="24" viewBox="0 0 16 12" style={{ imageRendering: 'pixelated' }}>
@@ -408,7 +408,7 @@ export function PaintScene() {
               <rect x="0" y="11" width="16" height="1" fill="#8B6914" />
               <rect x="0" y="0" width="1" height="12" fill="#8B6914" />
               <rect x="15" y="0" width="1" height="12" fill="#8B6914" />
-              {/* 캔버스 위 그림 */}
+              {/* Drawing on canvas */}
               <rect x="3" y="3" width="4" height="3" fill="#87CEEB" />
               <rect x="8" y="4" width="3" height="4" fill="#4CAF50" />
               <rect x="5" y="5" width="2" height="3" fill="#F5A623" />
@@ -421,7 +421,7 @@ export function PaintScene() {
   );
 }
 
-// 장면 6: 박스 운반 (업로드 완료)
+// Scene 6: Carrying box (upload complete)
 export function CarryScene() {
   return (
     <>
@@ -449,7 +449,7 @@ export function CarryScene() {
       `}</style>
 
       <div className="relative flex items-end justify-center" style={{ height: 100, width: 180 }}>
-        {/* 박스 */}
+        {/* Box */}
         <div className="carry-box absolute" style={{ top: 6, left: '50%', transform: 'translateX(-50%)' }}>
           <svg width="60" height="44" viewBox="0 0 20 14" style={{ imageRendering: 'pixelated' }}>
             <rect x="1" y="2" width="18" height="11" fill="#C8956B" />
@@ -472,7 +472,7 @@ export function CarryScene() {
   );
 }
 
-// 장면 7: 마이크 노래 + 헤드셋 듣기 (대사 추출)
+// Scene 7: Microphone singing + headset listening (dialogue extraction)
 export function MicScene() {
   return (
     <>
@@ -505,7 +505,7 @@ export function MicScene() {
       `}</style>
 
       <div className="relative flex items-end justify-center gap-4" style={{ height: 100, width: 180 }}>
-        {/* 음표 */}
+        {/* Musical notes */}
         <div className="sing-note-1 absolute" style={{ top: 2, left: 30 }}>
           <span style={{ fontSize: 14, color: '#F5A623' }}>&#9835;</span>
         </div>
@@ -513,7 +513,7 @@ export function MicScene() {
           <span style={{ fontSize: 12, color: '#8B2FC9' }}>&#9834;</span>
         </div>
 
-        {/* 문어 + 마이크 */}
+        {/* Octopus + microphone */}
         <div className="sing-octopus flex flex-col items-center" style={{ marginBottom: 8 }}>
           <div style={{ marginBottom: -6 }}>
             <svg width="20" height="32" viewBox="0 0 7 12" style={{ imageRendering: 'pixelated' }}>
@@ -528,7 +528,7 @@ export function MicScene() {
           <OctopusSVG />
         </div>
 
-        {/* 너구리 + 헤드셋 */}
+        {/* Raccoon + headset */}
         <div className="listen-raccoon flex flex-col items-center">
           <div style={{ marginBottom: -8, marginLeft: -2 }}>
             <svg width="36" height="14" viewBox="0 0 18 7" style={{ imageRendering: 'pixelated' }}>
@@ -546,7 +546,7 @@ export function MicScene() {
   );
 }
 
-// 장면 8: 열쇠 뽑기 (키프레임 추출)
+// Scene 8: Pulling key (keyframe extraction)
 export function KeyScene() {
   return (
     <>
@@ -578,27 +578,27 @@ export function KeyScene() {
       `}</style>
 
       <div className="relative flex items-end justify-center" style={{ height: 110, width: 200 }}>
-        {/* 큰 열쇠 (땅에 박힌) */}
+        {/* Large key (stuck in ground) */}
         <div className="key-wiggle absolute" style={{ bottom: 0, left: '50%', transform: 'translateX(-50%)' }}>
           <svg width="40" height="70" viewBox="0 0 14 24" style={{ imageRendering: 'pixelated' }}>
-            {/* 열쇠 머리 (원형) */}
+            {/* Key head (circular) */}
             <rect x="3" y="0" width="8" height="2" fill="#F5A623" />
             <rect x="2" y="1" width="10" height="6" fill="#F5A623" />
             <rect x="3" y="7" width="8" height="1" fill="#F5A623" />
-            {/* 열쇠 구멍 */}
+            {/* Keyhole */}
             <rect x="5" y="3" width="4" height="3" fill="#C88A1A" />
-            {/* 열쇠 몸통 */}
+            {/* Key body */}
             <rect x="6" y="8" width="2" height="10" fill="#F5A623" />
-            {/* 열쇠 이빨 */}
+            {/* Key teeth */}
             <rect x="8" y="14" width="3" height="2" fill="#F5A623" />
             <rect x="8" y="17" width="2" height="2" fill="#F5A623" />
-            {/* 땅 */}
+            {/* Ground */}
             <rect x="0" y="20" width="14" height="4" fill="#555" />
             <rect x="4" y="18" width="6" height="3" fill="#666" />
           </svg>
         </div>
 
-        {/* 흔들림 이펙트 */}
+        {/* Shake effect */}
         <div className="ground-shake absolute" style={{ bottom: 2, left: '50%', transform: 'translateX(-50%)' }}>
           <svg width="80" height="8" viewBox="0 0 40 4" style={{ imageRendering: 'pixelated' }}>
             <rect x="2" y="1" width="4" height="1" fill="#888" />
@@ -608,12 +608,12 @@ export function KeyScene() {
           </svg>
         </div>
 
-        {/* 문어 (왼쪽에서 당기기) */}
+        {/* Octopus (pulling from left) */}
         <div className="pull-left absolute" style={{ bottom: 16, left: 10 }}>
           <OctopusSVG />
         </div>
 
-        {/* 너구리 (오른쪽에서 당기기) */}
+        {/* Raccoon (pulling from right) */}
         <div className="pull-right absolute" style={{ bottom: 8, right: 10 }}>
           <RaccoonSVG />
         </div>
@@ -622,7 +622,7 @@ export function KeyScene() {
   );
 }
 
-// 메인페이지용: 좌우 마스코트 폴짝 + 가운데 납짝 글자
+// Main page: Mascots bouncing + Napzzak title in center
 export function MainBounceAnimation({ className = '' }: { className?: string }) {
   return (
     <>
@@ -665,15 +665,15 @@ export function MainBounceAnimation({ className = '' }: { className?: string }) 
   );
 }
 
-// 단계별 씬 선택 헬퍼
+// Stage scene selection helper
 export function StageAnimation({ step }: { step: number }) {
-  // 0: 박스 운반 (업로드 완료)
-  // 1: 마이크+헤드셋 (대사 추출)
-  // 2: 열쇠 뽑기 (키프레임 추출)
-  // 3-5: 검색/분석 (Step A/B/C)
-  // 6-7: 망치/납짝 (검증/설계)
-  // 8-9: 그리기 (이미지 생성)
-  // 10: 댄스 (완성)
+  // 0: Carrying box (upload complete)
+  // 1: Microphone+headset (dialogue extraction)
+  // 2: Pulling key (keyframe extraction)
+  // 3-5: Search/analysis (Step A/B/C)
+  // 6-7: Hammer/squish (verification/design)
+  // 8-9: Drawing (image generation)
+  // 10: Dance (complete)
   if (step === 0) return <CarryScene />;
   if (step === 1) return <MicScene />;
   if (step === 2) return <KeyScene />;

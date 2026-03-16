@@ -1,4 +1,4 @@
-# 납짝 (Napzzak) - 기술 아키텍처 문서 v6
+# 납짝 (Napzzak) - 기술 아키텍처 문서 v8
 
 > 영상을 업로드하면 AI 멀티-패스 분석을 통해 스토리 기반 N컷 만화로 자동 변환하는 서비스
 
@@ -8,12 +8,10 @@
 
 | 모델/서비스 | 모델 ID / 서비스 | 역할 | API 방식 |
 |-------------|-----------------|------|----------|
-| **Nova Pro** | `us.amazon.nova-pro-v1:0` | Pass 1 Step A/B/C (영상 심층 분석) · 반박 검증 · Pass 2 (패널 구조 추출) | Converse API (`ConverseCommand`) |
-| **Nova Canvas** | `amazon.nova-canvas-v1:0` | 패널별 개별 만화 이미지 생성 + 통합 페이지 생성 | InvokeModel API |
+| **Nova Pro** | `us.amazon.nova-pro-v1:0` | Pass 1 Step A/B/C (영상 심층 분석) · 반박 검증 · Pass 2 멀티에이전트 전체 (Planner · Consolidator · Descriptor · Reviewer) | Converse API (`ConverseCommand`) |
+| **Nova Canvas** | `amazon.nova-canvas-v1:0` | 패널별 개별 만화 이미지 생성 + 통합 페이지 생성 (Budget Allocator 프롬프트) | InvokeModel API |
 | **Nova 2 Sonic** | `amazon.nova-2-sonic-v1:0` | 만화 패널 대사 음성 내레이션 (on-demand) | Bidirectional Stream API |
 | **AWS Transcribe** | Amazon Transcribe | 영상에서 대사 텍스트 추출 (화자 분리 포함) | TranscribeStreamingClient |
-
-> Nova Multimodal Embeddings는 현재 미사용 (프레임 중복 제거는 ffmpeg 기반 키프레임 추출로 대체)
 
 ---
 
@@ -75,26 +73,34 @@
     └─────────────┬───────────────────────────┘
                   ↓
     ┌─────────────────────────────────────────┐
-    │  STAGE 5: Pass 2 - 만화 패널 구조 추출   │
-    │  (Nova Pro)                           │
-    │    입력: S3 영상 + 검증된 DeepAnalysis    │
+    │  STAGE 5: Pass 2 - 멀티에이전트 패널 분할  │
+    │                                         │
+    │  5-A: P-A Panel Planner (Nova Pro)      │
+    │    + P-C Character Consolidator (Pro)   │
+    │    → 병렬 실행 (Promise.all)             │
+    │    → 4개 핵심 장면 선택 + 캐릭터 통합      │
+    │                                         │
+    │  5-B: P-B Scene Descriptor (Nova Pro)   │
+    │    → P-A + P-C 결과 기반 상세 장면 묘사    │
+    │                                         │
+    │  5-C: P-D Panel Reviewer (Nova Pro)     │
+    │    → 대사 중복/클라이맥스/일관성 검증       │
+    │                                         │
+    │  (실패 시 기존 단일 에이전트로 fallback)    │
     │    출력: NovaAnalysisResult JSON         │
-    │      - characterDescriptions            │
-    │      - 4~6개 패널 구조                   │
-    │      - climaxIndex                      │
     └─────────────┬───────────────────────────┘
                   ↓
     ┌─────────────────────────────────────────┐
     │  STAGE 6: 패널별 이미지 생성              │
     │  Nova Canvas (TEXT_IMAGE) × N패널        │
     │                                         │
-    │  각 패널마다:                             │
-    │    - 아트 스타일 프리픽스                  │
-    │    - characterDescriptions 공통 주입      │
-    │    - 스토리 컨텍스트                      │
-    │    - 상세 장면 description                │
-    │    - negativeText (텍스트/말풍선 차단)     │
+    │  Budget Allocator 프롬프트 (1024자 제한): │
+    │    Tier 1: 아트스타일+Mood+NoText (필수)  │
+    │    Tier 2: 장면묘사+캐릭터설명 (80%)      │
+    │    Tier 3: 배경+내러티브 (13%)            │
+    │    Tier 4: 인접패널 컨텍스트 (여유시만)     │
     │                                         │
+    │  + negativeText (텍스트/말풍선 차단)       │
     │  + 통합 만화 페이지 1장 (폴백용)           │
     └─────────────┬───────────────────────────┘
                   ↓
@@ -249,7 +255,7 @@ videos/{jobId}/
 
 ---
 
-## 7. 처리 진행 단계 (10단계)
+## 7. 처리 진행 단계 (13단계)
 
 | 단계 | progress 값 | 설명 |
 |------|-------------|------|
@@ -260,8 +266,11 @@ videos/{jobId}/
 | 5 | `analyzing_pass1_stepB` | Nova Pro: 행동 순서 + 인과관계 분석 |
 | 6 | `analyzing_pass1_stepC` | Nova Pro: 스토리 종합 (기승전결 아크) |
 | 7 | `verifying` | Nova Pro: 반박 질문 기반 분석 결과 검증 |
-| 8 | `analyzing_pass2` | Nova Pro: 만화 패널 구조 추출 |
-| 9 | `generating_panels` | Nova Canvas: 패널별 개별 이미지 생성 (1/N ~ N/N) |
+| 8 | `analyzing_pass2` | Pass 2 멀티에이전트 시작 |
+| 8a | `pass2_planning` | Nova Pro: P-A(Planner) + P-C(CharConsolidator) 병렬 실행 |
+| 8b | `pass2_describing` | Nova Pro: P-B(Scene Descriptor) 상세 장면 묘사 |
+| 8c | `pass2_reviewing` | Nova Pro: P-D(Panel Reviewer) 최종 검증 |
+| 9 | `generating_panels` | Nova Canvas: 패널별 개별 이미지 생성 (Budget Allocator 프롬프트) |
 | 10 | `generating_comic` | Nova Canvas: 통합 만화 페이지 생성 (폴백용) |
 | - | `completed` | 만화 생성 완료 |
 
@@ -306,12 +315,53 @@ Step C 결과를 6가지 반박 질문으로 검증:
 5. 대화-행동 일관성
 6. 보컬 미미크리 감지
 
-### Pass 2: 패널 구조 추출 (Nova Pro)
+### Pass 2: 멀티에이전트 패널 분할
 
-검증된 DeepAnalysis를 컨텍스트로 주입하여:
-- **characterDescriptions**: 이미지 생성기용 캐릭터 외모 통합 설명
-- **panels**: 4~6개 패널, 각각 100-200자 description + 감정 + 대사(EN/KO)
-- **climaxIndex**: 가장 극적인 패널 지정
+검증된 DeepAnalysis를 4개 전문 에이전트가 분업 처리:
+
+```
+DeepAnalysis
+    |
+    +---> [P-A: Panel Planner (Nova Pro)]   ----+
+    |     어떤 4개 장면을 선택할지 결정           |
+    |                                           |
+    +---> [P-C: Character Consolidator (Pro)]  --+
+          캐릭터 설명 통합/요약                    |
+                                                v
+                                   [P-B: Scene Descriptor (Nova Pro)]
+                                    각 패널의 상세 장면 묘사 작성
+                                                |
+                                                v
+                                   [P-D: Panel Reviewer (Nova Pro)]
+                                    누락/중복/일관성 검증
+                                                |
+                                                v
+                                        NovaAnalysisResult
+```
+
+| 에이전트 | 모델 | 역할 |
+|---------|------|------|
+| **P-A: Panel Planner** | Nova Pro | 스토리 아크에서 4개 핵심 장면 선택, 기승전결 매핑 |
+| **P-B: Scene Descriptor** | Nova Pro | 각 패널의 상세 물리적 장면 묘사, 감정, 대사 추출 |
+| **P-C: Character Consolidator** | Nova Pro | 캐릭터 외모 설명을 이미지 프롬프트용으로 통합 |
+| **P-D: Panel Reviewer** | Nova Pro | 최종 검증 (대사 중복, 클라이맥스 확인, 캐릭터 일관성) |
+
+- P-A + P-C **병렬 실행** → P-B → P-D 순차
+- 실패 시 기존 단일 에이전트(`extractPanelStructure`)로 자동 fallback
+
+### 이미지 프롬프트 Budget Allocator (canvas.ts)
+
+Nova Canvas API의 text prompt 하드 리밋(1024자)을 우선순위 기반으로 분배:
+
+| 우선순위 | 파트 | 예산 전략 |
+|---------|------|----------|
+| Tier 1 (필수) | Art style prefix, Mood, "No text" 지시문 | 먼저 예약 (~138자) |
+| Tier 2 (높음) | Panel description (55%), Character descriptions (45%) | 가용 예산의 80% |
+| Tier 3 (중간) | Setting, Narrative context | 남은 예산의 13% |
+| Tier 4 (낮음) | Previous/Next scene context | 예산 여유 있을 때만 |
+
+- Mood와 "No text"는 항상 프롬프트 말미에 위치하되, 예산은 최우선 확보
+- Safety `.slice(0, 1024)` + `console.warn` 유지
 
 ---
 
@@ -334,8 +384,8 @@ Step C 결과를 6가지 반박 질문으로 검증:
 | 서비스 | 리소스 | 용도 |
 |--------|--------|------|
 | **Amazon S3** | `napzzak-videos-{accountId}` | 영상, 패널 이미지, Story JSON 저장 |
-| **Amazon Bedrock** | Nova Pro | 영상 Pass 1 (Step A/B/C) + 반박 검증 + Pass 2 패널 기획 |
-| **Amazon Bedrock** | Nova Canvas | 패널별 만화 이미지 생성 |
+| **Amazon Bedrock** | Nova Pro | 영상 Pass 1 (Step A/B/C) + 반박 검증 + Pass 2 멀티에이전트 전체 |
+| **Amazon Bedrock** | Nova Canvas | 패널별 만화 이미지 생성 (Budget Allocator 프롬프트) |
 | **Amazon Bedrock** | Nova 2 Sonic | 음성 내레이션 |
 | **Amazon Transcribe** | Streaming API | 영상 대사 추출 + 화자 분리 |
 | **Amazon DynamoDB** | `napzzak-jobs-{accountId}` | Job 상태 관리 |
@@ -349,7 +399,7 @@ Step C 결과를 6가지 반박 질문으로 검증:
 | **프레임워크** | Next.js 16 (App Router) |
 | **언어** | TypeScript |
 | **스타일링** | Tailwind CSS |
-| **AI (분석)** | Amazon Bedrock Nova Pro (3단계 CoT) |
+| **AI (분석)** | Amazon Bedrock Nova Pro (3단계 CoT + 멀티에이전트) |
 | **AI (이미지)** | Amazon Bedrock Nova Canvas |
 | **AI (음성)** | Amazon Bedrock Nova 2 Sonic |
 | **음성 인식** | Amazon Transcribe (Streaming) |
@@ -362,18 +412,20 @@ Step C 결과를 6가지 반박 질문으로 검증:
 
 ## 12. 차별화 포인트
 
-1. **Amazon Nova Pro** - 3단계 CoT 분석 + 반박 검증 + 패널 구조 추출까지 단일 모델로 처리
+1. **Amazon Nova Pro 멀티에이전트** - Pass 1 ~ Pass 2 전 과정을 Nova Pro 단일 모델 기반 멀티에이전트로 처리
 2. **3단계 Chain-of-Thought 분석** - Step A(대사) → Step B(행동) → Step C(종합) 순차 분석
 3. **반박 검증 게이트** - 6가지 adversarial 질문으로 분석 오류 자동 교정
-4. **AWS Transcribe 통합** - 화자 분리된 정확한 대사 텍스트를 AI 분석에 주입
-5. **ffmpeg 키프레임 추출** - 0.5초 간격 프레임으로 시각 정보 강화
-6. **CSS 대사 오버레이** - AI 텍스트 렌더링 한계를 구조적으로 해결
-7. **4가지 그림체** - Graphic Novel / Soft Painting / Flat Vector / 3D Animation
-8. **이중 언어 대사** - 한국어↔영어 대사 지원 + ON/OFF 토글
-9. **2가지 뷰모드** - panel(패널별 그리드) / page(단일 페이지) 레이아웃
-10. **영구 저장** - S3 + DynamoDB 기반, 재방문 시 즉시 로드
-11. **음성 내레이션** - Nova 2 Sonic으로 대사 음성 재생 (on-demand)
-12. **마스코트 캐릭터** - 납서(문어) + 짝이(너구리) 납짝 애니메이션
+4. **멀티에이전트 패널 분할** - P-A(Planner) + P-C(CharConsolidator) 병렬 → P-B(SceneDescriptor) → P-D(Reviewer) 4단계 분업
+5. **프롬프트 Budget Allocator** - Nova Canvas 1024자 제한을 Tier 1~4 우선순위 기반 예산 분배로 해결, Mood/"No text" 절대 잘리지 않음
+6. **AWS Transcribe 통합** - 화자 분리된 정확한 대사 텍스트를 AI 분석에 주입
+7. **ffmpeg 키프레임 추출** - 0.5초 간격 프레임으로 시각 정보 강화
+8. **CSS 대사 오버레이** - AI 텍스트 렌더링 한계를 구조적으로 해결
+9. **4가지 그림체** - Graphic Novel / Soft Painting / Flat Vector / 3D Animation
+10. **이중 언어 대사** - 한국어↔영어 대사 지원 + ON/OFF 토글
+11. **2가지 뷰모드** - panel(패널별 그리드) / page(단일 페이지) 레이아웃
+12. **영구 저장** - S3 + DynamoDB 기반, 재방문 시 즉시 로드
+13. **음성 내레이션** - Nova 2 Sonic으로 대사 음성 재생 (on-demand)
+14. **마스코트 캐릭터** - 납서(문어) + 짝이(너구리) 납짝 애니메이션
 
 ---
 
@@ -387,9 +439,12 @@ Step C 결과를 6가지 반박 질문으로 검증:
 | Step B (행동 분석) | Nova Pro | 1회 | 인과관계 |
 | Step C (종합) | Nova Pro | 1~2회 | 품질 검증 재시도 포함 |
 | 반박 검증 | Nova Pro | 1회 | Adversarial |
-| Pass 2 (패널 기획) | Nova Pro | 1~3회 | 재시도 포함 |
-| 패널별 이미지 | Nova Canvas | 4~6회 | 패널 수만큼 |
+| Pass 2 P-A (Planner) | Nova Pro | 1회 | 장면 선택 |
+| Pass 2 P-C (CharConsolidator) | Nova Pro | 1회 | P-A와 병렬 |
+| Pass 2 P-B (SceneDescriptor) | Nova Pro | 1회 | 상세 묘사 |
+| Pass 2 P-D (Reviewer) | Nova Pro | 1회 | 검증 |
+| 패널별 이미지 | Nova Canvas | 4~6회 | Budget Allocator 프롬프트 |
 | 통합 페이지 | Nova Canvas | 1회 | 레거시/폴백 |
 | 음성 내레이션 | Nova 2 Sonic | on-demand | 사용자 요청 시 |
-| **최초 생성 총합** | | **11~16회** | |
+| **최초 생성 총합** | | **14~19회** | Nova Pro 8~9회 + Canvas 5~7회 |
 | **그림체 변경** | Nova Canvas | 5~7회 | 패널 재생성만 |

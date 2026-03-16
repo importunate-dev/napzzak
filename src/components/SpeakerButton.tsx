@@ -24,7 +24,7 @@ export default function SpeakerButton({ isLoading, isPlaying, onClick, size = 'm
             ? 'bg-purple-700 text-purple-200 animate-pulse'
             : 'bg-purple-600/80 text-white hover:bg-purple-500 hover:shadow-lg'}
       `}
-      title={isPlaying ? '정지' : '대사 듣기'}
+      title={isPlaying ? 'Stop' : 'Listen to dialogue'}
     >
       {isLoading ? (
         <svg className={`${iconSize} animate-spin`} fill="none" viewBox="0 0 24 24">

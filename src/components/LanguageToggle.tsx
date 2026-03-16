@@ -17,7 +17,7 @@ export default function LanguageToggle({ current, onChange, disabled }: Props) {
   return (
     <div className="flex justify-center mb-6">
       <div className="inline-flex items-center gap-2">
-        <span className="text-gray-500 text-xs mr-1">대사 언어</span>
+        <span className="text-gray-500 text-xs mr-1">Dialogue Language</span>
         <div className="inline-flex bg-gray-900 rounded-lg p-0.5 gap-0.5">
           {LANGUAGES.map((lang) => (
             <button

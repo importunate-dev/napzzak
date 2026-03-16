@@ -35,7 +35,7 @@ export async function getImageEmbedding(imagePath: string): Promise<number[]> {
   const responseBody = JSON.parse(new TextDecoder().decode(response.body));
   const embedding = responseBody.embedding;
   if (!Array.isArray(embedding) || embedding.length === 0) {
-    throw new Error('Nova Embeddings 응답에 유효한 embedding이 없습니다');
+    throw new Error('No valid embedding found in Nova Embeddings response');
   }
   return embedding as number[];
 }
@@ -53,11 +53,11 @@ function cosineSimilarity(a: number[], b: number[]): number {
 }
 
 /**
- * 프레임 목록에서 시각적으로 중복되는 장면을 제거합니다.
- * Nova Multimodal Embeddings로 각 프레임을 벡터화한 뒤,
- * 코사인 유사도가 threshold 이상인 프레임을 제거합니다.
+ * Removes visually duplicate scenes from the frame list.
+ * Vectorizes each frame using Nova Multimodal Embeddings,
+ * then removes frames with cosine similarity above the threshold.
  *
- * @returns 중복이 제거된 프레임의 원본 인덱스 배열
+ * @returns Array of original indices of deduplicated frames
  */
 export async function deduplicateFrames(
   framePaths: string[],
@@ -67,14 +67,14 @@ export async function deduplicateFrames(
     return framePaths.map((_, i) => i);
   }
 
-  console.log(`[Embeddings] ${framePaths.length}개 프레임 임베딩 생성 중...`);
+  console.log(`[Embeddings] Generating embeddings for ${framePaths.length} frames...`);
   const embeddings: number[][] = [];
   for (const path of framePaths) {
     try {
       const embedding = await getImageEmbedding(path);
       embeddings.push(embedding);
     } catch (err) {
-      console.warn(`[Embeddings] 프레임 임베딩 실패, 건너뜀:`, err);
+      console.warn(`[Embeddings] Frame embedding failed, skipping:`, err);
       embeddings.push([]);
     }
   }
@@ -102,6 +102,6 @@ export async function deduplicateFrames(
     }
   }
 
-  console.log(`[Embeddings] ${framePaths.length}개 → ${keptIndices.length}개 (${framePaths.length - keptIndices.length}개 중복 제거)`);
+  console.log(`[Embeddings] ${framePaths.length} → ${keptIndices.length} (${framePaths.length - keptIndices.length} duplicates removed)`);
   return keptIndices;
 }

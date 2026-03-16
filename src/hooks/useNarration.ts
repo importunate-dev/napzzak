@@ -49,13 +49,13 @@ export function useNarration() {
           });
 
           if (!res.ok) {
-            let errorMsg = '음성 생성 실패';
+            let errorMsg = 'Speech generation failed';
             try {
               const errBody = await res.json();
               if (errBody.error) errorMsg = errBody.error;
               if (errBody.message) errorMsg = errBody.message;
             } catch {
-              errorMsg = `음성 생성 실패 (${res.status}: ${res.statusText})`;
+              errorMsg = `Speech generation failed (${res.status}: ${res.statusText})`;
             }
             setState({ isLoading: false, isPlaying: false, activeCutId: null, error: errorMsg });
             return;
@@ -78,13 +78,13 @@ export function useNarration() {
         };
 
         audio.onerror = () => {
-          setState({ isLoading: false, isPlaying: false, activeCutId: null, error: '오디오 재생에 실패했습니다' });
+          setState({ isLoading: false, isPlaying: false, activeCutId: null, error: 'Failed to play audio' });
         };
 
         await audio.play();
       } catch (err) {
         console.error('[Narration]', err);
-        const message = err instanceof Error ? err.message : '음성 생성 중 오류가 발생했습니다';
+        const message = err instanceof Error ? err.message : 'An error occurred during speech generation';
         setState({ isLoading: false, isPlaying: false, activeCutId: null, error: message });
       }
     },

@@ -35,7 +35,7 @@ export interface TranscribeResult {
 }
 
 /**
- * 영상 버퍼에서 오디오를 추출하고 AWS Transcribe로 대사를 추출합니다.
+ * Extracts audio from video buffer and extracts dialogue using AWS Transcribe.
  */
 export async function transcribeFromVideo(
   videoBuffer: Buffer,
@@ -45,23 +45,23 @@ export async function transcribeFromVideo(
   let audioPath = '';
 
   try {
-    // 1. 영상을 임시 파일로 저장
+    // 1. Save video to temp file
     videoPath = await saveVideoToTemp(videoBuffer);
 
-    // 2. ffmpeg으로 오디오 추출
+    // 2. Extract audio with ffmpeg
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'napzzak-audio-'));
     audioPath = path.join(tmpDir, 'audio.mp3');
     await extractAudio(videoPath, audioPath);
-    console.log(`[Transcribe] 오디오 추출 완료: ${audioPath}`);
+    console.log(`[Transcribe] Audio extraction complete: ${audioPath}`);
 
-    // 3. S3에 오디오 업로드
+    // 3. Upload audio to S3
     const audioBuffer = await fs.readFile(audioPath);
     const audioKey = `temp/${jobId}/audio.mp3`;
     await uploadToS3(audioKey, audioBuffer, 'audio/mpeg');
     const s3AudioUri = `s3://${BUCKET_NAME}/${audioKey}`;
-    console.log(`[Transcribe] S3 업로드 완료: ${s3AudioUri}`);
+    console.log(`[Transcribe] S3 upload complete: ${s3AudioUri}`);
 
-    // 4. AWS Transcribe 실행
+    // 4. Run AWS Transcribe
     const transcriptionJobName = `napzzak-${jobId}-${Date.now()}`;
     await transcribeClient.send(
       new StartTranscriptionJobCommand({
@@ -76,13 +76,13 @@ export async function transcribeFromVideo(
         },
       })
     );
-    console.log(`[Transcribe] 작업 시작: ${transcriptionJobName}`);
+    console.log(`[Transcribe] Job started: ${transcriptionJobName}`);
 
-    // 5. 완료 대기
+    // 5. Wait for completion
     const result = await waitForTranscription(transcriptionJobName);
     return result;
   } finally {
-    // 임시 파일 정리
+    // Clean up temp files
     if (videoPath) await cleanupTemp(videoPath);
     if (audioPath) {
       try {
@@ -110,7 +110,7 @@ function extractAudio(videoPath: string, audioPath: string): Promise<void> {
 }
 
 async function waitForTranscription(jobName: string): Promise<TranscribeResult> {
-  const MAX_WAIT_MS = 120_000; // 2분
+  const MAX_WAIT_MS = 120_000; // 2 minutes
   const POLL_INTERVAL_MS = 3_000;
   const startTime = Date.now();
 
@@ -124,7 +124,7 @@ async function waitForTranscription(jobName: string): Promise<TranscribeResult> 
     if (status === TranscriptionJobStatus.COMPLETED) {
       const transcriptUri = response.TranscriptionJob?.Transcript?.TranscriptFileUri;
       if (!transcriptUri) {
-        throw new Error('Transcribe 완료했지만 결과 URI가 없습니다');
+        throw new Error('Transcribe completed but result URI is missing');
       }
 
       const languageCode = response.TranscriptionJob?.LanguageCode;
@@ -133,14 +133,14 @@ async function waitForTranscription(jobName: string): Promise<TranscribeResult> 
 
     if (status === TranscriptionJobStatus.FAILED) {
       const reason = response.TranscriptionJob?.FailureReason;
-      throw new Error(`Transcribe 실패: ${reason}`);
+      throw new Error(`Transcribe failed: ${reason}`);
     }
 
-    // 대기
+    // Wait
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
   }
 
-  throw new Error('Transcribe 타임아웃 (2분 초과)');
+  throw new Error('Transcribe timeout (exceeded 2 minutes)');
 }
 
 async function fetchAndParseTranscript(
@@ -149,13 +149,13 @@ async function fetchAndParseTranscript(
 ): Promise<TranscribeResult> {
   const response = await fetch(transcriptUri);
   if (!response.ok) {
-    throw new Error(`Transcribe 결과 다운로드 실패: ${response.status}`);
+    throw new Error(`Transcribe result download failed: ${response.status}`);
   }
 
   const data = await response.json();
   const segments: TranscriptSegment[] = [];
 
-  // speaker label 매핑 구성
+  // Build speaker label mapping
   const speakerMap = new Map<string, string>();
   if (data.results?.speaker_labels?.segments) {
     for (const seg of data.results.speaker_labels.segments) {
@@ -165,7 +165,7 @@ async function fetchAndParseTranscript(
     }
   }
 
-  // items에서 세그먼트 구성
+  // Build segments from items
   const items = data.results?.items || [];
   let currentSegment: TranscriptSegment | null = null;
 
@@ -199,7 +199,7 @@ async function fetchAndParseTranscript(
   }
 
   const fullText = segments.map((s) => s.text).join(' ');
-  console.log(`[Transcribe] 파싱 완료: ${segments.length}개 세그먼트, "${fullText.slice(0, 100)}..."`);
+  console.log(`[Transcribe] Parsing complete: ${segments.length} segments, "${fullText.slice(0, 100)}..."`);
 
   return {
     fullText,

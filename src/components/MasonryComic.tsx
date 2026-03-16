@@ -9,12 +9,12 @@ interface Props {
 }
 
 const EMOTION_STYLES: Record<string, { border: string; bg: string; label: string }> = {
-  joy: { border: 'border-yellow-400', bg: 'bg-yellow-400/5', label: '기쁨' },
-  sadness: { border: 'border-blue-400', bg: 'bg-blue-400/5', label: '슬픔' },
-  surprise: { border: 'border-purple-400', bg: 'bg-purple-400/5', label: '놀람' },
-  anger: { border: 'border-red-400', bg: 'bg-red-400/5', label: '분노' },
-  fear: { border: 'border-gray-400', bg: 'bg-gray-400/5', label: '공포' },
-  neutral: { border: 'border-gray-600', bg: 'bg-gray-800/50', label: '평온' },
+  joy: { border: 'border-yellow-400', bg: 'bg-yellow-400/5', label: 'Joy' },
+  sadness: { border: 'border-blue-400', bg: 'bg-blue-400/5', label: 'Sadness' },
+  surprise: { border: 'border-purple-400', bg: 'bg-purple-400/5', label: 'Surprise' },
+  anger: { border: 'border-red-400', bg: 'bg-red-400/5', label: 'Anger' },
+  fear: { border: 'border-gray-400', bg: 'bg-gray-400/5', label: 'Fear' },
+  neutral: { border: 'border-gray-600', bg: 'bg-gray-800/50', label: 'Neutral' },
 };
 
 function getCardSpan(panelIndex: number, isClimax: boolean): string {
@@ -81,7 +81,7 @@ export default function MasonryComic({ storyJson }: Props) {
 
                 <div className="flex items-center justify-between text-xs text-gray-500 px-1">
                   <span>{emotionStyle.label}</span>
-                  <span>패널 {panel.panelId}</span>
+                  <span>Panel {panel.panelId}</span>
                 </div>
               </div>
             </div>
